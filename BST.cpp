@@ -11,8 +11,8 @@ struct Mod
 {
     int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
     string campo; // campo a ser modificado
-    //GENERIC valor; // valor a ser modificado
-    //Struct para as modificações, talvez não seja necessária a implementação de um struct para isso, mas, é.
+    int modChave;
+    Node* modPointer; 
     //Mod() : ver(0), campo(0), valor(0) {}
 };
 
@@ -23,14 +23,14 @@ struct Node
     Node *pai;    // ponteiro pai!
     int chave;    // <- talvez isso não seja guardado em uma só variável mas sim esteja em um vetor
     // + um vetor com as modificações de cada versão
-    int returns; 
-    int modsTotal;
-    Node* retorno[50]; //<- vetor com os ponteiros de retorno de tamanho p. Usando um array só porque é menos custoso ? pode ser um vector
-    Mod mods[100];
-    // pela definição do professor, 2p = 99, ou seja, teremos no max 99 modificações.
+    //Node* retorno[50]; //<- vetor com os ponteiros de retorno de tamanho p. Usando um array só porque é menos custoso ? pode ser um vector
+    vector<Mod> mods; 
+    // como a árvore binária de busca já mantém ponteiros para o nó 
+    // esquerdo e direito, não precisamos do vetor de retorno, já temos os ponteiros, 
+    // então, basta anotar mudanças nesses ponteiros como mods     
     Node() // essa forma de inicializar as coisa é tão bonita...
     : esq(nullptr), dir(nullptr), pai(nullptr),
-      chave(0), returns(0), modsTotal(0) {}
+      chave(0) {}
 };
 
 struct BST
@@ -38,12 +38,43 @@ struct BST
     Node *raiz;
     int vers = 0;
 
+    void atualizaCadeia(Node *no, int versao){
+        Node *novo_no; 
+        novo_no->esq = no->esq; 
+        novo_no->dir = no->dir;
+        novo_no->pai = no->pai;
+        //por favor transformar isso num switch case . 
+        if(no->mods[0].campo == "esq")
+            novo_no->esq = no->mods[1].modPointer; 
+        else if(no->mods[0].campo == "dir")
+            novo_no->dir = no->mods[1].modPointer; 
+        else if(no->mods[0].campo == "pai")
+            novo_no->pai = no->mods[1].modPointer; 
+        else
+            novo_no->chave = no->mods[1].modChave; 
+        //mods aplicados, agora modifica os ponteiros de retorno
+        if (no->pai->esq == no)
+            modifica(no->pai, versao, "esq", novo_no);
+        else
+            modifica(no->pai, versao, "dir", novo_no); 
+        modifica(no->esq, versao, "pai", novo_no);
+        modifica(no->dir, versao, "pai", novo_no);
+    }
+
     void modifica(Node *no, int versao, string campo, auto valor){
-        if (no->modsTotal < 99){
-            //no->mods[modsTotal] = Mod(campo, valor) <- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
+        if (no->mods.empty()){
+            Mod modifica; 
+            if(decltype(valor) == Node*){
+                modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
+                no->mods[0] = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
+            }
+            else{
+                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
+                no->mods[0] = modifica;
+            }
         }
         else{
-            //atualizaCadeia(no) <- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
+            atualizaCadeia(no, versao) //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
             /*
             1. Criar nova cópia deste nó
             2. Aplicar todos os mods para obter novos campos originais neste novo nó 
@@ -87,8 +118,7 @@ struct BST
             }
         else if (no_novo->chave < no_ant->chave){ 
             //no novo é filho esquerdo de no_ant:
-            no_novo->retorno[no_novo->returns] = no_ant; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
-            no_novo->returns++;
+            no_novo->pai = no_ant; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
             // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
             // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
             modifica(no_ant, arvore->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
@@ -96,8 +126,7 @@ struct BST
             }
         else{
             //processo equivalente para caso no_novo seja filho direito
-            no_novo->retorno[no_novo->returns] = no_ant;
-            no_novo->returns++;
+            no_novo->pai = no_ant;
             modifica(no_ant, arvore->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
             modifica(no_ant, arvore->vers + 1, "retorno", no_novo);
             }
