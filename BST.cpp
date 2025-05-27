@@ -35,35 +35,49 @@ struct Node
 
 struct BST
 {
+    // aqui, na verdade, temos que ter um vetor com uma tupla (raiz, versao),
+    // pois toda versão da árvore tem que ter especificada sua raiz. 
     Node *raiz;
     int vers = 0;
 
-    void atualizaCadeia(Node *no, int versao){
+    void atualizaCadeia(Node *no, int versao, Mod modificacao_nova){
         Node *novo_no; 
         novo_no->esq = no->esq; 
         novo_no->dir = no->dir;
         novo_no->pai = no->pai;
         //por favor transformar isso num switch case . 
         if(no->mods[0].campo == "esq")
-            novo_no->esq = no->mods[1].modPointer; 
+            novo_no->esq = no->mods[0].modPointer; 
         else if(no->mods[0].campo == "dir")
-            novo_no->dir = no->mods[1].modPointer; 
+            novo_no->dir = no->mods[0].modPointer; 
         else if(no->mods[0].campo == "pai")
-            novo_no->pai = no->mods[1].modPointer; 
+            novo_no->pai = no->mods[0].modPointer; 
         else
             novo_no->chave = no->mods[1].modChave; 
+        // mods que vieram do o nó anterior ^
+        // mods que acabou de ser aplicada:
+        if(modificacao_nova.campo == "esq")
+            novo_no->esq = modificacao_nova.modPointer; 
+        else if(modificacao_nova.campo == "dir")
+            novo_no->dir = modificacao_nova.modPointer; 
+        else if(modificacao_nova.campo == "pai")
+            novo_no->pai = modificacao_nova.modPointer; 
+        else
+            novo_no->chave = modificacao_nova.modChave; 
+        // como esse mod foi o que acabou de ser passado e estorou o vetor de mods do nó
+        // ele não é anotado como nova modificação e, na verdade, é o estado atual do nó 
         //mods aplicados, agora modifica os ponteiros de retorno
         if (no->pai->esq == no)
-            modifica(no->pai, versao, "esq", novo_no);
+            modificar(no->pai, versao, "esq", novo_no);
         else
-            modifica(no->pai, versao, "dir", novo_no); 
-        modifica(no->esq, versao, "pai", novo_no);
-        modifica(no->dir, versao, "pai", novo_no);
+            modificar(no->pai, versao, "dir", novo_no); 
+        modificar(no->esq, versao, "pai", novo_no);
+        modificar(no->dir, versao, "pai", novo_no);
     }
 
-    void modifica(Node *no, int versao, string campo, auto valor){
+    void modificar(Node *no, int versao, string campo, auto valor){
+        Mod modifica; 
         if (no->mods.empty()){
-            Mod modifica; 
             if(decltype(valor) == Node*){
                 modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
                 no->mods[0] = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
@@ -72,9 +86,16 @@ struct BST
                 modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
                 no->mods[0] = modifica;
             }
+            
         }
         else{
-            atualizaCadeia(no, versao) //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
+             if(decltype(valor) == Node*){
+                modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
+            }
+            else{
+                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
+            }
+            atualizaCadeia(no, versao, modifica) //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
             /*
             1. Criar nova cópia deste nó
             2. Aplicar todos os mods para obter novos campos originais neste novo nó 
@@ -100,6 +121,8 @@ struct BST
             return busca(no->dir, k);
     }
     void inserir(BST *arvore, Node *no_novo){ // estaremos na versão x e criaremos a versão x+1
+        //assumimos que a inserção vai acontecer na versão arvore->vers. Só incrementamos a versão dps
+        //de fazer uma modificação, não antes. Ou seja, começamos da 'versão 0'
         Node *no_ant;                  // no anterior
         Node *no_atual = arvore->raiz; // prox no
         while (no_atual != nullptr){
@@ -121,15 +144,14 @@ struct BST
             no_novo->pai = no_ant; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
             // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
             // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
-            modifica(no_ant, arvore->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
-            modifica(no_ant, arvore->vers + 1, "retorno", no_novo);
+            modificar(no_ant, arvore->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
             }
         else{
             //processo equivalente para caso no_novo seja filho direito
             no_novo->pai = no_ant;
-            modifica(no_ant, arvore->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
-            modifica(no_ant, arvore->vers + 1, "retorno", no_novo);
+            modificar(no_ant, arvore->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
             }
+            arvore->vers++;
         }
     /*
         TO-DOS persistência: implementar as operações considerando as versões.
