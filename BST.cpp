@@ -119,6 +119,26 @@ struct BST
         tree->versions.push_back(tree->root); //nova versão vai para o vetor de versões. 
         return; 
     }
+    void aplicaMods(Node *atual, Node *temp, int version){
+        // em resumo, um atual = temp. 
+        temp->chave = atual->chave;
+        temp->esq = atual->esq;
+        temp->dir = atual->dir;
+        temp->pai = atual->pai;
+        temp->isRoot = atual->isRoot;  
+        if(atual->mods.empty()) return;
+        if(atual->mods[0].campo == "esq")
+            temp->esq = atual->mods[0].modPointer; 
+        else if(atual->mods[0].campo == "dir")
+            temp->dir = atual->mods[0].modPointer; 
+        else if(atual->mods[0].campo == "pai")
+            temp->pai = atual->mods[0].modPointer; 
+        else if(atual->mods[0].campo == "root")
+            temp->isRoot = atual->mods[0].modPointer; 
+        else
+            temp->chave = atual->mods[0].modChave; 
+        return;
+    }
     void inserir(BST *tree, int k, int version){ // inserção é sempre na versão tree->vers, ou seja, na última versão da árvore
         //assumimos que a inserção vai acontecer na versão arvore->vers. Só incrementamos a versão dps
         //de fazer uma modificação, não antes. Ou seja, começamos da 'versão 0'
@@ -130,32 +150,27 @@ struct BST
             tree->root = no_novo;
             tree->versions.push_back(tree->root);
         }
-        Node *no_ant; 
+        Node *no_temp; 
         while (no_atual != nullptr){
-            no_ant = no_atual;
-            if (no_novo->chave < no_atual->chave)
-            {
+            aplicaMods(no_atual, no_temp, version);
+            //no_ant = no_atual;
+            if (no_novo->chave < no_temp->chave)
                 no_atual = no_atual->esq;
-            }
             else
                 no_atual = no_atual->dir;
             }
-        no_novo->pai = no_ant;
-        if (no_ant == nullptr){ 
-            //arvore vazia, no novo é raiz.
-            tree->root = no_novo;
-            }
-        else if (no_novo->chave < no_ant->chave){ 
+        no_novo->pai = no_temp;
+        if(no_novo->chave < no_temp->chave){ 
             //no novo é filho esquerdo de no_ant:
-            no_novo->pai = no_ant; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
+            no_novo->pai = no_temp; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
             // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
             // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
-            modificar(tree, no_ant, tree->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
+            modificar(tree, no_temp, tree->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
             }
         else{
             //processo equivalente para caso no_novo seja filho direito
-            no_novo->pai = no_ant;
-            modificar(tree, no_ant, tree->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
+            no_novo->pai = no_temp;
+            modificar(tree, no_temp, tree->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
             }
             tree->vers++;
         }
