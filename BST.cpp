@@ -81,9 +81,7 @@ struct BST
             modificar(tree, no->pai, versao, "dir", novo_no); 
         modificar(tree, no->esq, versao, "pai", novo_no);
         modificar(tree, no->dir, versao, "pai", novo_no);
-        if (novo_no->isRoot){
-            tree->root = novo_no; 
-        }
+        if (novo_no->isRoot) tree->root = novo_no; 
     }
     template <typename T> 
     void modificar(BST *tree, Node *no, int versao, string campo, T valor){
@@ -100,12 +98,10 @@ struct BST
             
         }
         else{
-             if(decltype(valor) == Node*){
+             if(decltype(valor) == Node*)
                 modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
-            }
-            else{
+            else
                 modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
-            }
             atualizaCadeia(tree, no, versao, modifica) //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
             /*
             1. Criar nova cópia deste nó
@@ -126,7 +122,7 @@ struct BST
         temp->dir = atual->dir;
         temp->pai = atual->pai;
         temp->isRoot = atual->isRoot;  
-        if(atual->mods.empty()) return;
+        if((atual->mods.empty()) || (atual->mods[0].ver > version)) return;
         if(atual->mods[0].campo == "esq")
             temp->esq = atual->mods[0].modPointer; 
         else if(atual->mods[0].campo == "dir")
