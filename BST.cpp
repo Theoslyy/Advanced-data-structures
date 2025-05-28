@@ -36,7 +36,8 @@ struct BST
 {
     // aqui, na verdade, temos que ter um vetor com uma tupla (raiz, versao),
     // pois toda versão da árvore tem que ter especificada sua raiz. 
-    Node *root;
+    Node *root; // raiz da versão vers - 1. vers é a 'versão a ser criada' na próx mod. 
+    vector<Node*> nodes;
     vector<Node*> versions; // -> não precisa ser uma tupla de (int, node), o índice do vetor já dá em que versão estamos
     int vers; // desnecessário, é só ver o tamanho do vetor versions, mas ajuda na organização. 
     
@@ -44,44 +45,46 @@ struct BST
     :   root(nullptr), vers(0) {}
 
     void atualizaCadeia(BST* tree, Node *no, int versao, Mod modificacao_nova){
-        Node *novo_no; 
-        novo_no->esq = no->esq; 
-        novo_no->dir = no->dir;
-        novo_no->pai = no->pai;
-        novo_no->isRoot = no->isRoot;
+        Node *no_novo = new Node(); 
+        no_novo->esq = no->esq; 
+        no_novo->dir = no->dir;
+        no_novo->pai = no->pai;
+        no_novo->isRoot = no->isRoot;
         //por favor transformar isso num switch case . 
         if(no->mods[0].campo == "esq")
-            novo_no->esq = no->mods[0].modPointer; 
+            no_novo->esq = no->mods[0].modPointer; 
         else if(no->mods[0].campo == "dir")
-            novo_no->dir = no->mods[0].modPointer; 
+            no_novo->dir = no->mods[0].modPointer; 
         else if(no->mods[0].campo == "pai")
-            novo_no->pai = no->mods[0].modPointer; 
+            no_novo->pai = no->mods[0].modPointer; 
         else if(no->mods[0].campo == "root")
-            novo_no->isRoot  = no->mods[0].modPointer;
+            no_novo->isRoot  = no->mods[0].modPointer;
         else
-            novo_no->chave = no->mods[0].modChave; 
+            no_novo->chave = no->mods[0].modChave; 
         // mods que vieram do o nó anterior ^
         // mods que acabou de ser aplicada:
         if(modificacao_nova.campo == "esq")
-            novo_no->esq = modificacao_nova.modPointer; 
+            no_novo->esq = modificacao_nova.modPointer; 
         else if(modificacao_nova.campo == "dir")
-            novo_no->dir = modificacao_nova.modPointer; 
+            no_novo->dir = modificacao_nova.modPointer; 
         else if(modificacao_nova.campo == "pai")
-            novo_no->pai = modificacao_nova.modPointer;
+            no_novo->pai = modificacao_nova.modPointer;
         else if(modificacao_nova.campo == "root")
-            novo_no->isRoot = modificacao_nova.modPointer;  
+            no_novo->isRoot = modificacao_nova.modPointer;  
         else
-            novo_no->chave = modificacao_nova.modChave; 
+            no_novo->chave = modificacao_nova.modChave; 
         // como esse mod foi o que acabou de ser passado e estorou o vetor de mods do nó
         // ele não é anotado como nova modificação e, na verdade, é o estado atual do nó 
         //mods aplicados, agora modifica os ponteiros de retorno
         if (no->pai->esq == no)
-            modificar(tree, no->pai, versao, "esq", novo_no);
+            modificar(tree, no->pai, versao, "esq", no_novo);
         else
-            modificar(tree, no->pai, versao, "dir", novo_no); 
-        modificar(tree, no->esq, versao, "pai", novo_no);
-        modificar(tree, no->dir, versao, "pai", novo_no);
-        if (novo_no->isRoot) tree->root = novo_no; 
+            modificar(tree, no->pai, versao, "dir", no_novo); 
+        modificar(tree, no->esq, versao, "pai", no_novo);
+        modificar(tree, no->dir, versao, "pai", no_novo);
+        if (no_novo->isRoot) tree->root = no_novo; 
+        tree->nodes.push_back(no_novo);
+
     }
     template <typename T> 
     void modificar(BST *tree, Node *no, int versao, string campo, T valor){
@@ -138,7 +141,8 @@ struct BST
     void inserir(BST *tree, int k, int version){ // inserção é sempre na versão tree->vers, ou seja, na última versão da árvore
         //assumimos que a inserção vai acontecer na versão arvore->vers. Só incrementamos a versão dps
         //de fazer uma modificação, não antes. Ou seja, começamos da 'versão 0'
-        Node *no_novo;                 
+        Node *no_novo = new Node();             
+        tree->nodes.push_back(no_novo);    
         no_novo->chave = k;
         Node *no_atual = tree->versions[version]; //começamos da raiz. 
         if(no_atual == nullptr){
@@ -146,7 +150,7 @@ struct BST
             tree->root = no_novo;
             tree->versions.push_back(tree->root);
         }
-        Node *no_temp; 
+        Node *no_temp = nullptr; 
         while (no_atual != nullptr){
             aplicaMods(no_atual, no_temp, version);
             //no_ant = no_atual;
