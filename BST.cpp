@@ -4,15 +4,30 @@
 #include <sstream>
 #include <algorithm>
 #include <unordered_map>
+#define NONE -10000
 
 using namespace std;
+
+enum field {
+    esq, dir, pai, chave, raiz, chave
+};
+
 
 struct Mod
 {
     int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
-    string campo; // campo a ser modificado
-    int modChave;
+    field campo; // campo a ser modificado 
+
+    //Olha acho melhor dividir aqui em dois campos mesmo que seja menos eficiente em memoria,
+    //O typename T está gerando erros de compilação por questão de tipos
+    //Não é interessante usar template em funções que mandam seus parametros pra outras funções
+    //Por que isso pode gerar exceções e comportamento imprevisivel ou inesperado
+    //O uso de template é bom quando é uma função modular com comportamento mais claro
+    int modChave; 
+    Node* modPtr;
+
     Node* modPointer; 
+    
     //Mod() : ver(0), campo(0), valor(0) {}
 };
 
@@ -45,67 +60,151 @@ struct BST
     :   root(nullptr), vers(0) {}
 
     void atualizaCadeia(BST* tree, Node *no, int versao, Mod modificacao_nova){
+        // O que isso faz ????
         Node *no_novo = new Node(); 
         no_novo->esq = no->esq; 
         no_novo->dir = no->dir;
         no_novo->pai = no->pai;
+
         no_novo->isRoot = no->isRoot;
-        //por favor transformar isso num switch case . 
-        if(no->mods[0].campo == "esq")
+
+        switch (no->mods[0].campo)
+        // Não existe 
+        {
+        case esq:
             no_novo->esq = no->mods[0].modPointer; 
-        else if(no->mods[0].campo == "dir")
+            break;
+
+        case dir:
             no_novo->dir = no->mods[0].modPointer; 
-        else if(no->mods[0].campo == "pai")
+            break;
+
+        case pai:
             no_novo->pai = no->mods[0].modPointer; 
-        else if(no->mods[0].campo == "root")
+            break;
+
+        case raiz:
             no_novo->isRoot  = no->mods[0].modPointer;
-        else
+            break;
+
+        case chave:
             no_novo->chave = no->mods[0].modChave; 
+            break;
+
+        default:
+            break;
+        }
+
+        /*
+        Conselho de boas praticas:
+            //
+            quando for usar if e else, em vez de fazer assim...
+
+            if(no->mods[0].campo == "esq")
+                no_novo->esq = no->mods[0].modPointer; 
+            else if(no->mods[0].campo == "dir")
+                no_novo->dir = no->mods[0].modPointer; 
+            else if(no->mods[0].campo == "pai")
+                no_novo->pai = no->mods[0].modPointer; 
+            else if(no->mods[0].campo == "root")
+                no_novo->isRoot  = no->mods[0].modPointer;
+            else
+                no_novo->chave = no->mods[0].modChave; 
+
+            Melhor fazer assim
+
+            string campo = no->mods[0].campo
+            if(campo == "esq") no_novo->esq = no->mods[0].modPointer; 
+
+            if(campo == "dir") no_novo->dir = no->mods[0].modPointer; 
+
+            if(campo == "pai") no_novo->pai = no->mods[0].modPointer; 
+
+            if(campo == "root") no_novo->isRoot = no->mods[0].modPointer; 
+
+            if(campo == "chave") no_novo->chave= no->mods[0].modPointer; 
+
+            O código fica mais legivel!!!
+
+            //
+        
+        */
+
         // mods que vieram do o nó anterior ^
         // mods que acabou de ser aplicada:
-        if(modificacao_nova.campo == "esq")
+        switch (modificacao_nova.campo)
+        {
+        case esq:
             no_novo->esq = modificacao_nova.modPointer; 
-        else if(modificacao_nova.campo == "dir")
+            break;
+
+        case dir:
             no_novo->dir = modificacao_nova.modPointer; 
-        else if(modificacao_nova.campo == "pai")
-            no_novo->pai = modificacao_nova.modPointer;
-        else if(modificacao_nova.campo == "root")
-            no_novo->isRoot = modificacao_nova.modPointer;  
-        else
+            break;
+
+        case pai:
+            no_novo->pai = modificacao_nova.modPointer; 
+            break;
+
+        case raiz:
+            no_novo->isRoot  = modificacao_nova.modPointer;
+            break;
+
+        case chave:
             no_novo->chave = modificacao_nova.modChave; 
+            break;
+
+        default:
+            break;
+        }
         // como esse mod foi o que acabou de ser passado e estorou o vetor de mods do nó
         // ele não é anotado como nova modificação e, na verdade, é o estado atual do nó 
         //mods aplicados, agora modifica os ponteiros de retorno
-        if (no->pai->esq == no)
-            modificar(tree, no->pai, versao, "esq", no_novo);
-        else
-            modificar(tree, no->pai, versao, "dir", no_novo); 
-        modificar(tree, no->esq, versao, "pai", no_novo);
-        modificar(tree, no->dir, versao, "pai", no_novo);
+        if (no->pai->esq == no) 
+            modificar(tree, no->pai, versao, esq, NONE, no_novo);
+        
+        else 
+            modificar(tree, no->pai, versao, dir, NONE, no_novo); 
+
+        modificar(tree, no->esq, versao, pai, NONE, no_novo);
+        modificar(tree, no->dir, versao, pai, NONE, no_novo);
         if (no_novo->isRoot) tree->root = no_novo; 
         tree->nodes.push_back(no_novo);
 
     }
-    template <typename T> 
-    void modificar(BST *tree, Node *no, int versao, string campo, T valor){
+
+    void modificar(BST *tree, Node *no, int versao, field campo, int valor_chave = NONE, Node* valor_no = nullptr){
         Mod modifica; 
         if (no->mods.empty()){ 
-            if(is_same<decltype(valor), Node*>){
-                modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
+            if(campo != chave && campo != raiz){ //Ou seja, o campo é um no!
+                modifica.ver = versao; 
+                modifica.campo = campo; 
+                modifica.modPointer = valor_no; 
                 no->mods[0] = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
+
             }
-            else{
-                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
+            else if(campo == chave) {
+                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor_chave; 
                 no->mods[0] = modifica;
             }
+
+            //E o caso que o campo modificado é a raiz???
             
         }
         else{
-             if(decltype(valor) == Node*)
-                modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor; 
-            else
-                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor; 
-            atualizaCadeia(tree, no, versao, modifica) //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
+            if(valor_no != nullptr){
+                modifica.ver = versao; 
+                modifica.campo = campo; 
+                modifica.modPointer = valor_no; 
+
+            }
+            else{
+                modifica.ver = versao; 
+                modifica.campo = campo; 
+                modifica.modChave = valor_chave; 
+            }
+
+            atualizaCadeia(tree, no, versao, modifica); //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
             /*
             1. Criar nova cópia deste nó
             2. Aplicar todos os mods para obter novos campos originais neste novo nó 
@@ -119,37 +218,60 @@ struct BST
         return; 
     }
     void aplicaMods(Node *atual, Node *temp, int version){
+
         // em resumo, um atual = temp. 
+
         temp->chave = atual->chave;
         temp->esq = atual->esq;
         temp->dir = atual->dir;
         temp->pai = atual->pai;
-        temp->isRoot = atual->isRoot;  
+        temp->isRoot = atual->isRoot; 
+
         if((atual->mods.empty()) || (atual->mods[0].ver > version)) return;
-        if(atual->mods[0].campo == "esq")
-            temp->esq = atual->mods[0].modPointer; 
-        else if(atual->mods[0].campo == "dir")
-            temp->dir = atual->mods[0].modPointer; 
-        else if(atual->mods[0].campo == "pai")
-            temp->pai = atual->mods[0].modPointer; 
-        else if(atual->mods[0].campo == "root")
-            temp->isRoot = atual->mods[0].modPointer; 
-        else
-            temp->chave = atual->mods[0].modChave; 
-        return;
+        
+        switch (atual->mods[0].campo){
+
+            case esq:
+                temp->esq = atual->mods[0].modPointer; 
+                break;
+
+            case dir:
+                temp->dir = atual->mods[0].modPointer; 
+                break;
+
+            case pai:
+                temp->pai = atual->mods[0].modPointer;  
+                break;
+
+            case raiz:
+                temp->isRoot = atual->mods[0].modPointer; 
+                break;
+
+            case chave:
+                temp->chave = atual->mods[0].modChave;                
+                break;
+        }
     }
-    void inserir(BST *tree, int k, int version){ // inserção é sempre na versão tree->vers, ou seja, na última versão da árvore
+
+
+    void inserir(BST *tree, int k, int version){ 
+        // inserção é sempre na versão tree->vers, ou seja, na última versão da árvore
         //assumimos que a inserção vai acontecer na versão arvore->vers. Só incrementamos a versão dps
         //de fazer uma modificação, não antes. Ou seja, começamos da 'versão 0'
-        Node *no_novo = new Node();             
+
+        Node *no_novo = new Node();        
+         
         tree->nodes.push_back(no_novo);    
         no_novo->chave = k;
+
         Node *no_atual = tree->versions[version]; //começamos da raiz. 
+
         if(no_atual == nullptr){
             no_novo->isRoot == true;
             tree->root = no_novo;
             tree->versions.push_back(tree->root);
         }
+
         Node *no_temp = nullptr; 
         while (no_atual != nullptr){
             aplicaMods(no_atual, no_temp, version);
@@ -159,18 +281,20 @@ struct BST
             else
                 no_atual = no_atual->dir;
             }
+
         no_novo->pai = no_temp;
+
         if(no_novo->chave < no_temp->chave){ 
             //no novo é filho esquerdo de no_ant:
             no_novo->pai = no_temp; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
             // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
             // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
-            modificar(tree, no_temp, tree->vers + 1, "esq", no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
+            modificar(tree, no_temp, tree->vers + 1, esq, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
             }
         else{
             //processo equivalente para caso no_novo seja filho direito
             no_novo->pai = no_temp;
-            modificar(tree, no_temp, tree->vers + 1, "dir", no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
+            modificar(tree, no_temp, tree->vers + 1, dir, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
             }
             tree->vers++;
         }
@@ -252,6 +376,7 @@ struct BST
             imprimir(no->dir);
         }
     }
+
     Node *busca(Node *no, int k) //, int version) -> essa função é necessária? 
     { // buscar em uma versao especifica requer aplicar as mods enquanto se desce na árvore para saber os filhos para o qual o nó aponta
         if ((no->esq == nullptr && no->dir == nullptr) || k == no->chave)
@@ -263,4 +388,54 @@ struct BST
         else
             return busca(no->dir, k);
     }
+
+    int get_key(Node* node, int version){
+        /*Função que lê corretamente a chave de um nó dada a sua versão
+        Implementei de forma que nó possa ter várias modificações dentro
+        dele, porém sabemos que só pode haver no máximo 1*/
+
+        for(int index = 0; index < node->mods.size(); index++) {
+        
+            if(node->mods[index].ver > version) 
+                return index > 0? node->mods[index-1].modChave : node->chave;
+
+        } 
+
+
+        return node->mods[node->mods.size() - 1].campo;
+
+
+    }
+
+
+    
+    void DFS_REC(Node* node, int version, int profundidade, vector<pair<int,int>>& dfs_vector) {
+        /*Função recursiva auxiliar que será usada para utilizar a DFS sem necessidade de dar 
+            profundidade=0 como um dos parametros na função */
+
+        if(node == nullptr) return;
+
+        DFS_REC(node->esq, version, profundidade + 1, dfs_vector);
+        dfs_vector.push_back(pair<int,int>(get_key(node, version), profundidade));
+        DFS_REC(node->dir, version, profundidade + 1, dfs_vector);
+
+    }
+
+    
+    vector<pair<int,int>> DFS(BST tree, int version){
+        /*Função que retorna uma array com o par (Chave, profundidade de um nó) */
+
+        Node* root = tree.versions[version];
+        vector<pair<int,int>> dfs_vector;
+
+        DFS_REC(root, version, 0, dfs_vector);
+
+        return dfs_vector;
+
+    }
+
+
+
+
+    
 };

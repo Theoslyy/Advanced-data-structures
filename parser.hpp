@@ -32,7 +32,7 @@ vector<string> split_string(string& str, char delimiter){
 
 /*Funções principais*/
 
-vector<operation> parser_text(){
+vector<operation> parser_text(string data_path){
     /*Função que lê o arquivo de entrada e retorna um vetor de triplas (Comando, Chave, Versão)
     
     No caso de Inclusao e remocao, onde não há versão, o campo de versão será igual a -1
