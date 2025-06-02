@@ -256,26 +256,35 @@ struct BST
             }
         tree->vers++;
         }
-    Node *minimo(Node *no)
+    Node *minimo(Node *no, int ver)
     {
-        while (no->esq != nullptr) // percorre a árvore até o nó mais a esquerda (que na BST é o de menor valor)
+        Node no_temp; 
+        aplicaMods(no, &no_temp, ver);
+        while (no_temp.esq != nullptr) // percorre a árvore até o nó mais a esquerda (que na BST é o de menor valor)
         {
-            no = no->esq;
+            no = no_temp.esq;
+            aplicaMods(no, &no_temp, ver);
         }
         return no;
     }
 
-    Node *sucessor(Node *no)
+    Node *sucessor(Node *no, int ver)
     {
-        if (no->dir != nullptr)
+        Node no_temp; 
+        Node no_pai_temp;
+        aplicaMods(no, &no_temp, ver);
+        if (no_temp.dir != nullptr)
         {
-            return minimo(no->dir); // se tiver filho a direita, o sucessor é o mínimo da subárvore direita
+            return minimo(no_temp.dir, ver); // se tiver filho a direita, o sucessor é o mínimo da subárvore direita
         }
-        Node *y = no->pai;
-        while (y != nullptr && no == y->dir) // se não tiver, então o sucessor é o primeiro ancestral que for pai do nó atual no qual atual é filho esquerdo
+        Node *y = no_temp.pai;
+        aplicaMods(y, &no_pai_temp, ver);
+        while (y != nullptr && no == no_pai_temp.dir) // se não tiver, então o sucessor é o primeiro ancestral que for pai do nó atual no qual atual é filho esquerdo
         {
             no = y;
-            y = no->pai;
+            aplicaMods(no, &no_temp, ver);
+            y = no_temp.pai;
+            aplicaMods(y, &no_pai_temp, ver);
         }
         return y;
     }
@@ -325,7 +334,7 @@ struct BST
             transplantar(tree, alvo, tempAlvo.esq, versao); // se não tiver filho direito, transplanta o filho esquerdo
         }
         else {
-            Node* sucessor = tree->sucessor(alvo); // se tiver os dois filhos, encontra o sucessor
+            Node* sucessor = tree->sucessor(alvo, versao); // se tiver os dois filhos, encontra o sucessor
             Node tempSucessor;
             aplicaMods(sucessor, &tempSucessor, versao); // aplica as modificações do sucessor para a versão desejada
 
