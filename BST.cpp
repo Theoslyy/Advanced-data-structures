@@ -294,7 +294,10 @@ struct BST
         aplicaMods(u, &tempU, versao);
 
         // se u for raiz, então v também será raiz
-        if (tempU.isRoot) modificar(tree, v, versao + 1, raiz, 1, nullptr); // v não tem pai, pois é raiz
+        if (tempU.isRoot) {
+            if(v != nullptr) modificar(tree, v, versao + 1, raiz, 1, nullptr); // v não tem pai, pois é raiz
+            else tree->root = v; //nullptr, arvore fica vazia.
+        } 
         else
         {
             Node tempPai;
