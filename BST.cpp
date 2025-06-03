@@ -7,21 +7,10 @@
 #define NONE -10000
 
 using namespace std;
+struct Node; struct Mod; 
 
 enum field {
-    esq, dir, pai, chave, raiz, chave
-};
-
-
-struct Mod
-{
-    int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
-    field campo; // campo a ser modificado 
-    int modChave; 
-    Node* modPtr;
-    Node* modPointer; 
-    
-    //Mod() : ver(0), campo(0), valor(0) {}
+    esq, dir, pai, chave, raiz
 };
 
 struct Node
@@ -38,6 +27,16 @@ struct Node
     Node() // essa forma de inicializar as coisa é tão bonita...
     : esq(nullptr), dir(nullptr), pai(nullptr),
       chave(0), isRoot(false) {}
+};
+struct Mod
+{
+    int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
+    field campo; // campo a ser modificado 
+    int modChave; 
+    Node* modPtr;
+    Node* modPointer; 
+    
+    //Mod() : ver(0), campo(0), valor(0) {}
 };
 
 struct BST
