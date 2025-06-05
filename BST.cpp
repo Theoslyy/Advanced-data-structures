@@ -230,27 +230,27 @@ struct BST
             return; 
             //caso em que o nó é raiz. 
         }
-        Node *no_temp = nullptr; 
+        Node no_temp; 
         while (no_atual != nullptr){
-            aplicaMods(no_atual, no_temp, version);
+            aplicaMods(no_atual, &no_temp, version);
             //no_ant = no_atual;
-            if (no_novo->chave < no_temp->chave)
+            if (no_novo->chave < no_temp.chave)
                 no_atual = no_atual->esq;
             else
                 no_atual = no_atual->dir;
         }
-        no_novo->pai = no_temp;
-        if(no_novo->chave < no_temp->chave){ 
+        no_novo->pai = &no_temp;
+        if(no_novo->chave < no_temp.chave){ 
             //no novo é filho esquerdo de no_ant:
-            no_novo->pai = no_temp; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
+            no_novo->pai = &no_temp; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
             // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
             // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
-            modificar(tree, no_temp, tree->vers + 1, esq, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
+            modificar(tree, &no_temp, tree->vers + 1, esq, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
             }
         else{
             //processo equivalente para caso no_novo seja filho direito
-            no_novo->pai = no_temp;
-            modificar(tree, no_temp, tree->vers + 1, dir, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
+            no_novo->pai = &no_temp;
+            modificar(tree, &no_temp, tree->vers + 1, dir, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
             }
         tree->vers++;
         }
