@@ -10,7 +10,7 @@ using namespace std;
 struct Node; struct Mod; 
 
 enum field {
-    esq, dir, pai, chave, raiz
+    esq, dir, pai, chave, raiz, nenhum
 };
 
 struct Node
@@ -18,7 +18,7 @@ struct Node
     Node *esq;    // ponteiro filho esquerdo
     Node *dir;    // ponteiro filho direito
     Node *pai;    // ponteiro pai!
-    vector<Mod> mods; // <- vetor de mods terá tamanho um
+    Mod mods; // <- vetor de mods terá tamanho um, logo, uasmos só uma variável
     int chave;    // 
     bool isRoot;
     // como a árvore binária de busca já mantém ponteiros para o nó 
@@ -26,17 +26,16 @@ struct Node
     // então, basta anotar mudanças nesses ponteiros como mods     
     Node() // essa forma de inicializar as coisa é tão bonita...
     : esq(nullptr), dir(nullptr), pai(nullptr),
-      chave(0), isRoot(false) {}
+      chave(0), mods(), isRoot(false) {}
 };
 struct Mod
 {
     int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
     field campo; // campo a ser modificado 
     int modChave; 
-    Node* modPtr;
     Node* modPointer; 
     
-    //Mod() : ver(0), campo(0), valor(0) {}
+    Mod() : ver(-1), campo(nenhum), modChave(0), modPointer(nullptr) {}
 };
 
 struct BST
@@ -57,27 +56,27 @@ struct BST
         no_novo->pai = no->pai;
         no_novo->isRoot = no->isRoot;
 
-        switch (no->mods[0].campo)
+        switch (no->mods.campo)
         // Não existe 
         {
         case esq:
-            no_novo->esq = no->mods[0].modPointer; 
+            no_novo->esq = no->mods.modPointer; 
             break;
 
         case dir:
-            no_novo->dir = no->mods[0].modPointer; 
+            no_novo->dir = no->mods.modPointer; 
             break;
 
         case pai:
-            no_novo->pai = no->mods[0].modPointer; 
+            no_novo->pai = no->mods.modPointer; 
             break;
 
         case raiz:
-            no_novo->isRoot  = no->mods[0].modChave;
+            no_novo->isRoot  = no->mods.modChave;
             break;
 
         case chave:
-            no_novo->chave = no->mods[0].modChave; 
+            no_novo->chave = no->mods.modChave; 
             break;
 
         default:
@@ -128,20 +127,20 @@ struct BST
 
     void modificar(BST *tree, Node *no, int versao, field campo, int valor_chave = NONE, Node* valor_no = nullptr){
         Mod modifica; 
-        if (no->mods.empty()){ 
+        if (no->mods.campo == nenhum){ //se o campo é nenhum, é pq não há mod. 
             if(campo != chave && campo != raiz){ //Ou seja, o campo é um no!
                 modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor_no; 
-                no->mods[0] = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
+                no->mods = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
 
             }
             else if(campo == chave) {
                 modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor_chave; 
-                no->mods[0] = modifica;
+                no->mods = modifica;
             }
             else{ // caso em que é uma raiz!
                 modifica.ver = versao; modifica.campo = campo; 
                 modifica.modChave = valor_chave; //já que bool -> 0 ou 1, usamos valor chave mod do bool raiz 
-                no->mods[0] = modifica;
+                no->mods = modifica;
                 if (valor_chave == 1)
                 tree->root = no; 
             }
@@ -187,29 +186,29 @@ struct BST
         temp->pai = atual->pai;
         temp->isRoot = atual->isRoot; 
 
-        if((atual->mods.empty()) || (atual->mods[0].ver > version)) return;
+        if((atual->mods.campo == nenhum) || (atual->mods.ver > version)) return;
         
-        switch (atual->mods[0].campo){
+        switch (atual->mods.campo){
 
             case esq:
-                temp->esq = atual->mods[0].modPointer; 
+                temp->esq = atual->mods.modPointer; 
                 break;
 
             case dir:
-                temp->dir = atual->mods[0].modPointer; 
+                temp->dir = atual->mods.modPointer; 
                 break;
 
             case pai:
-                temp->pai = atual->mods[0].modPointer;  
+                temp->pai = atual->mods.modPointer;  
                 break;
 
             case raiz:
-                temp->isRoot = atual->mods[0].modChave; 
+                temp->isRoot = atual->mods.modChave; 
                 if(temp->isRoot) temp->pai = nullptr; 
                 break;
 
             case chave:
-                temp->chave = atual->mods[0].modChave;                
+                temp->chave = atual->mods.modChave;                
                 break;
         }
     }
@@ -379,18 +378,17 @@ struct BST
         /*Função que lê corretamente a chave de um nó dada a sua versão
         Implementei de forma que nó possa ter várias modificações dentro
         dele, porém sabemos que só pode haver no máximo 1*/
-
-        for(int index = 0; index < node->mods.size(); index++) {
+        /*
+        caso fosse um vetor: 
+        for(int index = 0; index < 1; index++) {
         
             if(node->mods[index].ver > version) 
                 return index > 0? node->mods[index-1].modChave : node->chave;
 
         } 
-
-
-        return node->mods[node->mods.size() - 1].campo;
-
-
+        */
+        if(node->mods.ver <= version && node->mods.campo == chave) return node->mods.modChave;  
+        else return node->chave; 
     }
     
     void DFS_REC(Node* node, int version, int profundidade, vector<pair<int,int>>& dfs_vector) {
