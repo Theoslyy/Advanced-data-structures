@@ -12,7 +12,15 @@ struct Node; struct Mod;
 enum field {
     esq, dir, pai, chave, raiz, nenhum
 };
-
+struct Mod
+{
+    int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
+    field campo; // campo a ser modificado 
+    int modChave; 
+    Node* modPointer; 
+    
+    Mod() : ver(-1), campo(nenhum), modChave(0), modPointer(nullptr) {}
+};
 struct Node
 {
     Node *esq;    // ponteiro filho esquerdo
@@ -26,16 +34,7 @@ struct Node
     // então, basta anotar mudanças nesses ponteiros como mods     
     Node() // essa forma de inicializar as coisa é tão bonita...
     : esq(nullptr), dir(nullptr), pai(nullptr),
-      chave(0), mods(), isRoot(false) {}
-};
-struct Mod
-{
-    int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
-    field campo; // campo a ser modificado 
-    int modChave; 
-    Node* modPointer; 
-    
-    Mod() : ver(-1), campo(nenhum), modChave(0), modPointer(nullptr) {}
+      mods(), chave(0), isRoot(false) {}
 };
 
 struct BST
@@ -189,7 +188,8 @@ struct BST
         if((atual->mods.campo == nenhum) || (atual->mods.ver > version)) return;
         
         switch (atual->mods.campo){
-
+            case nenhum: 
+                break;
             case esq:
                 temp->esq = atual->mods.modPointer; 
                 break;
@@ -223,7 +223,7 @@ struct BST
         no_novo->chave = k;
         Node *no_atual = tree->versions[version]; //começamos da raiz. 
         if(no_atual == nullptr){
-            no_novo->isRoot == true;
+            no_novo->isRoot = true;
             tree->root = no_novo;
             tree->versions.push_back(tree->root);
             tree->vers++; 
