@@ -1,7 +1,10 @@
-#include "parser.hpp"
-#include "BST.cpp"
+#include "parser.hpp" 
+#include "BST.cpp"   
 #include <fstream>
 #include <iostream>
+#include <vector>
+#include <string>
+#include <tuple> 
 
 using namespace std;
 
@@ -9,48 +12,74 @@ int main() {
     string data_path;
     cin >> data_path;
 
-    vector<operation> v = parser_text(data_path);
+    vector<operation> v = parser_text(data_path); 
     BST arvore;
 
-    ofstream fout("out.txt"); // Saída conforme descrição
+    ofstream fout("out.txt"); 
 
     for (operation op : v) {
         command tipo = get<0>(op);
         int chave = get<1>(op);
-        int versao = get<2>(op);
+        int versao_input = get<2>(op);
 
         if (tipo == INC) {
-            arvore.inserir(&arvore, chave, arvore.vers);
+            // Insere na versão mais recente existente (arvore.versions.size() - 1).
+            int versao_base = arvore.versions.size() - 1; 
+            arvore.inserir(&arvore, chave, versao_base); 
         }
         else if (tipo == REM) {
-            arvore.remover(&arvore, chave, arvore.vers);
+            // Remove na versão mais recente existente (arvore.versions.size() - 1).
+            int versao_base = arvore.versions.size() - 1;
+            arvore.remover(&arvore, chave, versao_base); 
         }
         else if (tipo == SUC) {
-            int max_version = arvore.versions.size() - 1;
-            int ver = (versao < arvore.versions.size()) ? versao : max_version;
+            int max_version_idx = arvore.versions.size() - 1;
+            int ver_to_use; // Versão real a ser usada na busca
 
-            Node* atual = arvore.busca(&arvore, chave, ver);
-            Node* suc = arvore.sucessor(atual, ver);
+            // Define a versão a ser usada para busca
+            if (versao_input >= 0 && versao_input <= max_version_idx) {
+                ver_to_use = versao_input;
+            } else {
+                ver_to_use = max_version_idx; // Usa a versão mais recente se a solicitada não existe
+            }
 
-            fout << "SUC " << chave << " " << versao << "\n";
+            Node* atual = arvore.busca(&arvore, chave, ver_to_use);
+            Node* suc = arvore.sucessor(atual, ver_to_use);
+
+            fout << "SUC " << chave << " " << versao_input << "\n"; // Imprime a versão ORIGINAL do input
             if (suc != nullptr) {
-                int val = arvore.get_key(suc, ver);
+                int val = arvore.get_key(suc, ver_to_use);
                 fout << val << "\n";
             } else {
                 fout << "infinito\n";
             }
         }
         else if (tipo == IMP) {
-            int max_version = arvore.versions.size() - 1;
-            int ver = (versao < arvore.versions.size()) ? versao : max_version;
+            int max_version_idx = arvore.versions.size() - 1;
+            int ver_to_use; // Versão real a ser usada na DFS
 
-            fout << "IMP " << versao << "\n";
-            vector<pair<int, int>> impressoes = arvore.DFS(ver);
-
-            for (auto [chave, profundidade] : impressoes) {
-                fout << chave << "," << profundidade << " ";
+            // Define a versão a ser usada para impressão
+            if (versao_input >= 0 && versao_input <= max_version_idx) {
+                ver_to_use = versao_input;
+            } else {
+                ver_to_use = max_version_idx; // Usa a versão mais recente se a solicitada não existe
             }
-            fout << "\n";
+
+            fout << "IMP " << versao_input << "\n"; // IMPRIME A VERSÃO ORIGINAL DO INPUT
+
+            auto impressoes = arvore.DFS(ver_to_use);
+
+            if (impressoes.empty()) {
+                fout << "\n";  // Árvore vazia, imprime só a linha da operação e uma linha vazia
+            } else {
+                for (size_t i = 0; i < impressoes.size(); ++i) {
+                    fout << impressoes[i].first << "," << impressoes[i].second; 
+                    if (i < impressoes.size() - 1) {
+                        fout << " "; 
+                    }
+                }
+                fout << "\n"; 
+            }
         }
     }
 

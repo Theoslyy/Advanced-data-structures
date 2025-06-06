@@ -7,419 +7,422 @@
 #define NONE -10000
 
 using namespace std;
-struct Node; struct Mod; 
+struct Node; struct Mod;
 
 enum field {
     esq, dir, pai, chave, raiz, nenhum
 };
 
-struct Node
-{
+struct Mod {
+    int ver;   // versao na qual a modificacao foi aplicada
+    field campo; // campo a ser modificado
+    int modChave;
+    Node* modPointer;
+
+    Mod() : ver(-1), campo(nenhum), modChave(0), modPointer(nullptr) {}
+};
+
+struct Node {
     Node *esq;    // ponteiro filho esquerdo
     Node *dir;    // ponteiro filho direito
     Node *pai;    // ponteiro pai!
-    Mod mods; // <- vetor de mods terá tamanho um, logo, uasmos só uma variável
-    int chave;    // 
+    Mod mods; // <- vetor de mods terá tamanho um, logo, usamos só uma variável
+    int chave;    //
     bool isRoot;
-    // como a árvore binária de busca já mantém ponteiros para o nó 
-    // esquerdo e direito, não precisamos do vetor de retorno, já temos os ponteiros, 
-    // então, basta anotar mudanças nesses ponteiros como mods     
+    // como a árvore binária de busca já mantém ponteiros para o nó
+    // esquerdo e direito, não precisamos do vetor de retorno, já temos os ponteiros,
+    // então, basta anotar mudanças nesses ponteiros como mods
     Node() // essa forma de inicializar as coisa é tão bonita...
     : esq(nullptr), dir(nullptr), pai(nullptr),
       chave(0), mods(), isRoot(false) {}
 };
-struct Mod
-{
-    int ver;   // versao a se modificada, como a persistência é parcial, sempre modificamos na última versão
-    field campo; // campo a ser modificado 
-    int modChave; 
-    Node* modPointer; 
-    
-    Mod() : ver(-1), campo(nenhum), modChave(0), modPointer(nullptr) {}
-};
 
-struct BST
-{
-    Node *root; // raiz da versão vers - 1. vers é a 'versão a ser criada' na próx mod. 
-    vector<Node*> nodes;
+struct BST {
+    Node *root; // raiz da versão vers - 1. vers é a 'versão a ser criada' na próx mod.
+    vector<Node*> nodes; // Todos os nós criados, para gerenciamento de memória (opcional)
     vector<Node*> versions; // -> não precisa ser uma tupla de (int, node), o índice do vetor já dá em que versão estamos
-    int vers; // desnecessário, é só ver o tamanho do vetor versions, mas ajuda na organização. 
-    
+    int vers; // desnecessário, é só ver o tamanho do vetor versions, mas ajuda na organização.
+
     BST()
-    :   root(nullptr), vers(0) {}
+    :   root(nullptr), vers(0) {
+        versions.push_back(nullptr);  // Versão 0: árvore vazia (inicial)
+    }
 
-    void atualizaCadeia(BST* tree, Node *no, int versao, Mod modificacao_nova){
+    // Função auxiliar para criar uma cópia de um nó e aplicar uma modificação.
+    // Esta função será chamada por 'modificar' APENAS quando uma cópia é necessária.
+    // Retorna a nova cópia do nó que foi modificada.
+    void atualizaCadeia(BST* tree, Node *no, int versao_base, Mod modificacao_nova){ // Versão base para materializar
         // Criando o novo nó:
-        Node *no_novo = new Node(); 
-        no_novo->esq = no->esq; 
-        no_novo->dir = no->dir;
-        no_novo->pai = no->pai;
-        no_novo->isRoot = no->isRoot;
+        Node *no_novo = new Node();
+        Node temp_original; // Para materializar o estado do nó original
 
-        switch (no->mods.campo)
-        // Não existe 
-        {
-        case esq:
-            no_novo->esq = no->mods.modPointer; 
-            break;
-
-        case dir:
-            no_novo->dir = no->mods.modPointer; 
-            break;
-
-        case pai:
-            no_novo->pai = no->mods.modPointer; 
-            break;
-
-        case raiz:
-            no_novo->isRoot  = no->mods.modChave;
-            break;
-
-        case chave:
-            no_novo->chave = no->mods.modChave; 
-            break;
-
-        default:
-            break;
+        // Copia o estado "materializado" do nó original para o novo nó.
+        // Se o nó original já tinha uma modificação para essa mesma versão (versao_base),
+        // isso significa que 'no->mods.ver' já é 'versao_base'.
+        // Devemos materializar o estado do 'no' para a 'versao_base' antes de copiá-lo.
+        // Caso contrário, copia o estado base (fields esq, dir, pai, chave) do nó original.
+        if (no->mods.campo != nenhum && no->mods.ver == versao_base) {
+            aplicaMods(no, &temp_original, versao_base); // Use versao_base para materializar o estado do nó
+        } else {
+            temp_original = *no; // Copia o estado atual do nó
         }
-        // mods que vieram do o nó anterior ^
-        // mods que acabou de ser aplicada:
-        switch (modificacao_nova.campo)
-        {
-        case esq:
-            no_novo->esq = modificacao_nova.modPointer; 
-            break;
+        *no_novo = temp_original;
+        no_novo->mods = Mod(); // Limpa as modificações da cópia (será preenchida agora)
 
-        case dir:
-            no_novo->dir = modificacao_nova.modPointer; 
-            break;
+        // Aplica a nova modificação ao 'no_novo' (que é a cópia)
+        no_novo->mods = modificacao_nova;
 
-        case pai:
-            no_novo->pai = modificacao_nova.modPointer; 
-            break;
-
-        case raiz:
-            no_novo->isRoot  = modificacao_nova.modChave;
-            break;
-
-        case chave:
-            no_novo->chave = modificacao_nova.modChave; 
-            break;
-
-        default:
-            break;
-        }
-        // como esse mod foi o que acabou de ser passado e estorou o vetor de mods do nó
-        // ele não é anotado como nova modificação e, na verdade, é o estado atual do nó 
-        //mods aplicados, agora modifica os ponteiros de retorno
-        if (no_novo->isRoot){
-            no_novo->pai = nullptr;  
-            tree->root = no_novo;
-        }
-        if (no->pai != nullptr){
-            if (no->pai->esq == no) modificar(tree, no->pai, versao, esq, NONE, no_novo);
-            else modificar(tree, no->pai, versao, dir, NONE, no_novo); 
-        }
-        if(no->esq != nullptr) modificar(tree, no->esq, versao, pai, NONE, no_novo);
-        if(no->dir != nullptr) modificar(tree, no->dir, versao, pai, NONE, no_novo);
+        // Adiciona a cópia ao vetor de todos os nós para gerenciamento de memória
         tree->nodes.push_back(no_novo);
-    }
 
-    void modificar(BST *tree, Node *no, int versao, field campo, int valor_chave = NONE, Node* valor_no = nullptr){
-        Mod modifica; 
-        if (no->mods.campo == nenhum){ //se o campo é nenhum, é pq não há mod. 
-            if(campo != chave && campo != raiz){ //Ou seja, o campo é um no!
-                modifica.ver = versao; modifica.campo = campo; modifica.modPointer = valor_no; 
-                no->mods = modifica; //<- ou seja, se ainda há espaço para novas modificações, eu só taco elas no vetor de modificações
-
-            }
-            else if(campo == chave) {
-                modifica.ver = versao; modifica.campo = campo; modifica.modChave = valor_chave; 
-                no->mods = modifica;
-            }
-            else{ // caso em que é uma raiz!
-                modifica.ver = versao; modifica.campo = campo; 
-                modifica.modChave = valor_chave; //já que bool -> 0 ou 1, usamos valor chave mod do bool raiz 
-                no->mods = modifica;
-                if (valor_chave == 1)
-                tree->root = no; 
-            }
-            
-        }
-        else{
-            if(campo == esq || campo == dir || campo == pai){ 
-                //podemos mudar o pai de alguém para nullptr (raiz)
-                //No entanto, assim que um nó vira raiz, há duas modificações sobre ele:
-                //1. virar raiz; 2. apontar para null
-                //Assim... Temos que tratar como só uma modificação.
-                modifica.ver = versao; 
-                modifica.campo = campo; 
-                modifica.modPointer = valor_no; 
-
-            }
-            else{
-                modifica.ver = versao; 
-                modifica.campo = campo; 
-                modifica.modChave = valor_chave; 
-            }
-
-            atualizaCadeia(tree, no, versao, modifica); //<- se o campo de mods estiver cheio, temos que fazer o processo de atualização em cadeia:
-            /*
-            1. Criar nova cópia deste nó
-            2. Aplicar todos os mods para obter novos campos originais neste novo nó 
-            3. mods vazio
-            4. Quem aponta para o nó na última versão passa a apontar para o novo nó na nova versão
-            */
-        }
-        //se alguma atualização mudar ponteiros de retorno, atualizar os ponteiros de retorno do nó que atingimos, chama a função de novo!
-        //Atualizações em cascata mantém-se na mesma versão.
-        tree->versions.push_back(tree->root); //nova versão vai para o vetor de versões. 
-        return; 
-    }
-    void aplicaMods(Node *atual, Node *temp, int version){
-
-        // em resumo, um atual = temp. 
-
-        temp->chave = atual->chave;
-        temp->esq = atual->esq;
-        temp->dir = atual->dir;
-        temp->pai = atual->pai;
-        temp->isRoot = atual->isRoot; 
-
-        if((atual->mods.campo == nenhum) || (atual->mods.ver > version)) return;
-        
-        switch (atual->mods.campo){
-
-            case esq:
-                temp->esq = atual->mods.modPointer; 
-                break;
-
-            case dir:
-                temp->dir = atual->mods.modPointer; 
-                break;
-
-            case pai:
-                temp->pai = atual->mods.modPointer;  
-                break;
-
-            case raiz:
-                temp->isRoot = atual->mods.modChave; 
-                if(temp->isRoot) temp->pai = nullptr; 
-                break;
-
-            case chave:
-                temp->chave = atual->mods.modChave;                
-                break;
-        }
-    }
-
-
-    void inserir(BST *tree, int k, int version){ 
-        // inserção é sempre na versão tree->vers, ou seja, na última versão da árvore
-        //assumimos que a inserção vai acontecer na versão arvore->vers. Só incrementamos a versão dps
-        //de fazer uma modificação, não antes. Ou seja, começamos da 'versão 0'
-        Node *no_novo = new Node();        
-        tree->nodes.push_back(no_novo);    
-        no_novo->chave = k;
-        Node *no_atual = tree->versions[version]; //começamos da raiz. 
-        if(no_atual == nullptr){
-            no_novo->isRoot == true;
+        // Se o novo nó se torna raiz, seu pai é nulo e atualiza a raiz da árvore em construção
+        if (no_novo->isRoot){
+            no_novo->pai = nullptr;
             tree->root = no_novo;
-            tree->versions.push_back(tree->root);
-            tree->vers++; 
-            return; 
-            //caso em que o nó é raiz. 
         }
-        Node *no_temp = nullptr; 
-        while (no_atual != nullptr){
-            aplicaMods(no_atual, no_temp, version);
-            //no_ant = no_atual;
-            if (no_novo->chave < no_temp->chave)
-                no_atual = no_atual->esq;
-            else
-                no_atual = no_atual->dir;
+
+        // AGORA, ajusta os ponteiros de quem apontava para o nó original para apontar para a cópia (no_novo)
+        // Isso deve ser feito na *nova versão* que está sendo construída (tree->vers)
+
+        // Se o nó original tinha um pai, precisamos atualizar o ponteiro do pai
+        if (temp_original.pai != nullptr){
+            Node tempPaiNo;
+            aplicaMods(temp_original.pai, &tempPaiNo, versao_base); // Materializa o pai do 'no' na versao_base
+
+            // O pai de 'no' (temp_original.pai) deve apontar para 'no_novo' na nova versão
+            if (tempPaiNo.esq == no) { // Se 'no' era filho esquerdo do seu pai
+                modificar(tree, temp_original.pai, tree->vers, esq, NONE, no_novo);
+            } else if (tempPaiNo.dir == no) { // Se 'no' era filho direito do seu pai
+                modificar(tree, temp_original.pai, tree->vers, dir, NONE, no_novo);
+            }
+        } else if (no->isRoot) { // Se o nó original era a raiz da versao_alvo (ou versão anterior)
+            tree->root = no_novo; // A nova raiz da versão atual sendo construída é a cópia
         }
-        no_novo->pai = no_temp;
-        if(no_novo->chave < no_temp->chave){ 
-            //no novo é filho esquerdo de no_ant:
-            no_novo->pai = no_temp; // no_ant aponta para no_novo, logo, o array de retorno de no_novo tem que ter no_ant
-            // como o nó novo foi criado agora, não chamamos a função modifica, esses são os valores iniciais dele, e não 'modificações'
-            // como no_novo tambem aponta para no_ant, temos que atualizar o array de retorno de no_ant.
-            modificar(tree, no_temp, tree->vers + 1, esq, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo esq com o valor no_novo.
+
+        // Ajusta os ponteiros de filhos do nó original para que seus pais apontem para 'no_novo'
+        // (A cópia do nó original se torna o pai para seus filhos na nova versão)
+        if(temp_original.esq != nullptr){
+            modificar(tree, temp_original.esq, tree->vers, pai, NONE, no_novo);
+        }
+        if(temp_original.dir != nullptr){
+            modificar(tree, temp_original.dir, tree->vers, pai, NONE, no_novo);
+        }
+    }
+
+    // Esta função decide se uma modificação é aplicada diretamente ou se uma cópia é necessária.
+    // Retorna o nó (original ou uma nova cópia) que foi modificado e que agora pertence à versao_alvo.
+    Node* modificar(BST *tree, Node *no, int versao_alvo, field campo, int valor_chave = NONE, Node* valor_no = nullptr){
+        if (no == nullptr) return nullptr;
+
+        Mod modifica;
+        modifica.ver = versao_alvo;
+        modifica.campo = campo;
+        modifica.modChave = valor_chave;
+        modifica.modPointer = valor_no;
+
+        // Se o nó ainda não tem modificação para esta versão ou a modificação existente é de uma versão anterior
+        // Isso significa que podemos aplicar a modificação diretamente ao nó sem criar uma cópia
+        if (no->mods.campo == nenhum || no->mods.ver < versao_alvo) {
+            no->mods = modifica;
+            if (campo == raiz && valor_chave == 1) { // Se a modificação for tornar o nó raiz
+                tree->root = no;
+                no->pai = nullptr; // Raiz não tem pai
             }
-        else{
-            //processo equivalente para caso no_novo seja filho direito
-            no_novo->pai = no_temp;
-            modificar(tree, no_temp, tree->vers + 1, dir, NONE, no_novo); //-> modifica o no_ant na versão vers + 1 no campo dir com o valor no_novo.
+            return no; // Retorna o nó original, que foi modificado
+        } else { // O nó já tem uma modificação para esta 'versao_alvo', então precisamos de uma nova cópia na cadeia
+            // A versão base para aplicaMods dentro de atualizaCadeia deve ser a versão da modificação existente no nó.
+            atualizaCadeia(tree, no, no->mods.ver, modifica);
+            return tree->root; // Retorna a nova raiz, pois a atualização da cadeia pode ter mudado a raiz da nova versão
+        }
+    }
+
+    void aplicaMods(Node *atual, Node *temp, int version_query){
+        // em resumo, um atual = temp.
+        // Esta função "materializa" o estado de um nó para a 'version_query'
+        *temp = *atual; // Copia o estado base do nó (campos e ponteiros base)
+
+        // Se houver uma modificação válida para a 'version_query', aplica-a
+        // A modificação é válida se for para a versão exata que estamos consultando
+        if ((atual->mods.campo != nenhum) && (atual->mods.ver == version_query)) {
+             switch (atual->mods.campo){
+                case esq: temp->esq = atual->mods.modPointer; break;
+                case dir: temp->dir = atual->mods.modPointer; break;
+                case pai: temp->pai = atual->mods.modPointer; break;
+                case raiz: temp->isRoot = atual->mods.modChave; if(temp->isRoot) temp->pai = nullptr; break;
+                case chave: temp->chave = atual->mods.modChave; break;
+                default: break;
             }
+        }
+    }
+
+    void inserir(BST *tree, int k, int version_base) {
+        // 'version_base' é a versão da qual estamos partindo para criar a nova versão
+
+        // A raiz da nova versão (tree->root) deve ser inicializada a partir da raiz da versão base.
+        // Qualquer modificação subsequente irá atualizar tree->root para a nova cópia se a raiz mudar.
+        tree->root = tree->versions[version_base];
+
+        Node *no_novo = new Node();
+        no_novo->chave = k;
+        tree->nodes.push_back(no_novo); // Adiciona o nó novo à lista de todos os nós
+
+        if (tree->root == nullptr) { // Árvore base está vazia
+            // O nó novo se torna a raiz da nova versão
+            tree->root = modificar(tree, no_novo, tree->vers, raiz, 1, nullptr);
+        } else {
+            Node *no_atual_search = tree->root;
+            Node *no_anterior_search = nullptr;
+
+            Node no_temp_atual;
+            // Node no_temp_anterior; // Removido: não é usado aqui
+
+            while (no_atual_search != nullptr) {
+                aplicaMods(no_atual_search, &no_temp_atual, version_base);
+
+                no_anterior_search = no_atual_search;
+                // Nao precisamos materializar no_anterior_search aqui, ele é apenas uma referencia ao no_atual_search antes do loop.
+                // aplicaMods(no_anterior_search, &no_temp_anterior, version_base); // Removido: Redundante
+
+                if (no_novo->chave < no_temp_atual.chave)
+                    no_atual_search = no_temp_atual.esq;
+                else
+                    no_atual_search = no_temp_atual.dir;
+            }
+
+            // no_anterior_search é o nó pai onde o novo nó será anexado
+            // Precisamos materializar no_anterior_search aqui para obter seu estado na version_base
+            Node no_temp_anterior_materialized; // Nova cópia para materialização
+            aplicaMods(no_anterior_search, &no_temp_anterior_materialized, version_base);
+
+            // Precisamos garantir que o no_anterior_search é modificado para a nova versão,
+            // e obter a cópia (se houver) para anexar o novo nó.
+            // A modificação no pai não é 'pai', é 'esq' ou 'dir'. O pai do novo nó será o 'pai_modificado'.
+            Node* pai_modificado;
+
+            // Anexa o novo nó como filho do pai_modificado
+            if (no_novo->chave < no_temp_anterior_materialized.chave) {
+                pai_modificado = modificar(tree, no_anterior_search, tree->vers, esq, NONE, no_novo);
+            } else {
+                pai_modificado = modificar(tree, no_anterior_search, tree->vers, dir, NONE, no_novo);
+            }
+
+            // Define o pai do novo nó. O pai do no_novo é o nó retornado por modificar acima.
+            modificar(tree, no_novo, tree->vers, pai, NONE, pai_modificado);
+        }
+
+        // As novas versões são adicionadas no final da operação.
+        tree->versions.push_back(tree->root);
         tree->vers++;
-        }
-    Node *minimo(Node *no, int ver)
-    {
-        Node no_temp; 
-        aplicaMods(no, &no_temp, ver);
-        while (no_temp.esq != nullptr) // percorre a árvore até o nó mais a esquerda (que na BST é o de menor valor)
-        {
-            no = no_temp.esq;
-            aplicaMods(no, &no_temp, ver);
-        }
-        return no;
     }
 
-    Node *sucessor(Node *no, int ver)
-    {
-        Node no_temp; 
-        Node no_pai_temp;
+    Node *minimo(Node *no, int ver){
+        if (no == nullptr) return nullptr;
+        Node no_temp;
         aplicaMods(no, &no_temp, ver);
-        if (no_temp.dir != nullptr)
-        {
-            return minimo(no_temp.dir, ver); // se tiver filho a direita, o sucessor é o mínimo da subárvore direita
+        Node* current_node = no; // Manter um ponteiro para o nó real, não a cópia temporária
+        while (no_temp.esq != nullptr){ // percorre a árvore até o nó mais a esquerda (que na BST é o de menor valor)
+            current_node = no_temp.esq;
+            aplicaMods(current_node, &no_temp, ver);
         }
-        Node *y = no_temp.pai;
-        aplicaMods(y, &no_pai_temp, ver);
-        while (y != nullptr && no == no_pai_temp.dir) // se não tiver, então o sucessor é o primeiro ancestral que for pai do nó atual no qual atual é filho esquerdo
-        {
-            no = y;
-            aplicaMods(no, &no_temp, ver);
-            y = no_temp.pai;
-            aplicaMods(y, &no_pai_temp, ver);
-        }
-        return y;
+        return current_node; // Retorna o nó real
     }
 
-    void transplantar(BST *tree, Node* u, Node* v, int versao) 
-    {
+    Node* sucessor(Node* no, int ver) {
+        if (no == nullptr) return nullptr;
+
+        Node temp;
+        aplicaMods(no, &temp, ver);
+
+        // Caso 1: tem filho à direita → sucessor é o mínimo da subárvore direita
+        if (temp.dir != nullptr) {
+            return minimo(temp.dir, ver);
+        }
+
+        // Caso 2: sobe pela árvore até encontrar um ancestral do qual 'no' é filho à esquerda
+        Node* pai_real = temp.pai; // O ponteiro real para o pai
+        Node* filho_real = no; // O ponteiro real para o filho
+
+        while (pai_real != nullptr) { // se não tiver, então o sucessor é o primeiro ancestral que for pai do nó atual no qual atual é filho esquerdo
+            Node tempPai;
+            aplicaMods(pai_real, &tempPai, ver);
+
+            if (tempPai.esq == filho_real) {
+                return pai_real;
+            }
+
+            filho_real = pai_real;
+            pai_real = tempPai.pai;
+        }
+        return nullptr;
+    }
+
+    void transplantar(BST *tree, Node* u, Node* v, int versao_base) { // int versao)
+        // 'u' é o nó a ser substituído, 'v' é o nó que o substitui
+        // 'versao_base' é a versão da qual estamos lendo para determinar os pais/filhos
+
         Node tempU;
-        aplicaMods(u, &tempU, versao);
+        aplicaMods(u, &tempU, versao_base); // Estado de 'u' na versão base
 
         // se u for raiz, então v também será raiz
         if (tempU.isRoot) {
-            if(v != nullptr) modificar(tree, v, versao + 1, raiz, 1, nullptr); // v não tem pai, pois é raiz
-            else tree->root = v; //nullptr, arvore fica vazia.
-        } 
-        else
+            if (v != nullptr) { // Se 'v' existe, ele se torna a nova raiz
+                modificar(tree, v, tree->vers, raiz, 1, nullptr); // v não tem pai, pois é raiz
+            } else { // Se 'v' é nulo e 'u' era a raiz, a nova raiz da versão atual é nula
+                // Não há um nó para modificar para raiz=0, então apenas define tree->root
+                tree->root = nullptr;
+            }
+        }
+        else // 'u' não era a raiz
         {
             Node tempPai;
-            aplicaMods(tempU.pai, &tempPai, versao);
+            aplicaMods(tempU.pai, &tempPai, versao_base); // Estado do pai de 'u' na versão base
 
-            if (tempPai.esq == u)
-            {
-                modificar(tree, tempU.pai, versao + 1, esq, NONE, v); // se u for filho esquerdo de pai, então v também será filho esquerdo
-            }
-            else
-            {
-                modificar(tree, tempU.pai, versao + 1, dir, NONE, v); // se u for filho direito de pai, então v também será filho direito
-            }
+            Node* pai_u_modificado = modificar(tree, tempU.pai, tree->vers, pai, NONE, tempU.pai); // Garante que o pai é copiado se necessário
+            // O campo 'pai' aqui é apenas para forçar a cópia se necessário.
+            // A modificação real será para 'esq' ou 'dir' do pai.
 
-            if (v != nullptr)
-            {
-                modificar(tree, v, versao + 1, pai, NONE, tempU.pai); // v passa a ser filho de pai
+            if (tempPai.esq == u) // se u for filho esquerdo de pai, então v também será filho esquerdo
+                modificar(tree, pai_u_modificado, tree->vers, esq, NONE, v);
+            else if (tempPai.dir == u) // se u for filho direito de pai, então v também será filho direito
+                modificar(tree, pai_u_modificado, tree->vers, dir, NONE, v);
+
+            if (v != nullptr) // v passa a ser filho de pai
+            { // Se 'v' existe, atualiza o pai de 'v'
+                modificar(tree, v, tree->vers, pai, NONE, pai_u_modificado);
             }
         }
     }
 
-    void remover(BST *tree, int chave, int versao) {
-        Node* raiz = tree->versions[versao];
-        if(!raiz) return;
+    void remover(BST *tree, int chave, int versao_base) { // int versao)
+        // 'versao_base' é a versão da qual estamos partindo para criar a nova versão
 
-        Node* alvo = busca(tree, chave, versao);
-        if(!alvo) return; // se não encontrar o nó, não faz nada
+        // A raiz da nova versão (tree->root) deve ser inicializada a partir da raiz da versão base.
+        tree->root = tree->versions[versao_base];
+
+        if (tree->root == nullptr) { // Se a árvore base está vazia
+            tree->versions.push_back(nullptr); // Nova versão também vazia
+            tree->vers++;
+            return;
+        }
+
+        Node* alvo = buscaVersao(tree->root, chave, versao_base); // Busca na versão base
+        if (!alvo) { // se não encontrar o nó, não faz nada
+            tree->versions.push_back(tree->versions[versao_base]); // Nova versão é igual à base
+            tree->vers++;
+            return;
+        }
 
         Node tempAlvo;
-        aplicaMods(alvo, &tempAlvo, versao); // aplica as modificações do nó alvo para a versão desejada
+        aplicaMods(alvo, &tempAlvo, versao_base); // aplica as modificações do nó alvo para a versão desejada
 
-        if(tempAlvo.esq == nullptr) {
-            transplantar(tree, alvo, tempAlvo.dir, versao); // se não tiver filho esquerdo, transplanta o filho direito
-        }
-        else if(tempAlvo.dir == nullptr) {
-            transplantar(tree, alvo, tempAlvo.esq, versao); // se não tiver filho direito, transplanta o filho esquerdo
-        }
-        else {
-            Node* sucessor = tree->sucessor(alvo, versao); // se tiver os dois filhos, encontra o sucessor
-            Node tempSucessor;
-            aplicaMods(sucessor, &tempSucessor, versao); // aplica as modificações do sucessor para a versão desejada
+        if (tempAlvo.esq == nullptr) {
+            transplantar(tree, alvo, tempAlvo.dir, versao_base); // se não tiver filho esquerdo, transplanta o filho direito
+        } else if (tempAlvo.dir == nullptr) {
+            transplantar(tree, alvo, tempAlvo.esq, versao_base); // se não tiver filho direito, transplanta o filho esquerdo
+        } else {
+            Node* succ = minimo(tempAlvo.dir, versao_base); // se tiver os dois filhos, encontra o sucessor
+            Node tempSucc;
+            aplicaMods(succ, &tempSucc, versao_base); // aplica as modificações do sucessor para a versão desejada
 
-            if (tempSucessor.pai != alvo) {
-                transplantar(tree, sucessor, tempSucessor.dir, versao); // transplanta o sucessor por seu próprio filho direito
-                modificar(tree, sucessor, versao, dir, NONE, tempAlvo.dir); // atualiza o filho direito do sucessor
-                modificar(tree, sucessor, versao, pai, NONE, tempAlvo.pai); // atualiza o pai do sucessor
+            if (tempSucc.pai != alvo) {
+                transplantar(tree, succ, tempSucc.dir, versao_base); // transplanta o sucessor por seu próprio filho direito
+                // O sucessor precisa ter seu pai atualizado para seu novo filho direito se ele não era filho direto do alvo.
+                // Mas aqui, o foco é o sucessor em si.
+                // A linha abaixo é apenas para garantir que 'succ' é copiado se necessário para a nova versão.
+                if (tempSucc.dir != nullptr) {
+                    modificar(tree, tempSucc.dir, tree->vers, pai, NONE, succ); // Pai do filho direito do sucessor
+                }
             }
 
-            transplantar(tree, alvo, sucessor, versao); // transplanta o nó alvo pelo sucessor
-            modificar(tree, sucessor, versao, esq, NONE, tempAlvo.esq); // atualiza o filho esquerdo do sucessor
-            modificar(tree, tempAlvo.esq, versao, pai, NONE, sucessor); // atualiza a chave do sucessor
+            // Transplantar o alvo pelo sucessor (antes de ajustar os filhos do sucessor)
+            transplantar(tree, alvo, succ, versao_base);
+
+            // Agora, o sucessor (ou sua cópia) já é o novo nó na posição do alvo.
+            // Precisamos ajustar os filhos esquerdo e direito do sucessor na nova versão.
+            // O sucessor precisa ter os filhos do alvo.
+            Node* succ_modificado_esq = modificar(tree, succ, tree->vers, esq, NONE, tempAlvo.esq); // atualiza o filho esquerdo do sucessor
+            Node* succ_modificado_dir = modificar(tree, succ_modificado_esq, tree->vers, dir, NONE, tempAlvo.dir); // atualiza o filho direito do sucessor (após o esquerdo)
+
+            // Atualiza os pais dos filhos do alvo para apontarem para o sucessor
+            if (tempAlvo.esq != nullptr)
+                modificar(tree, tempAlvo.esq, tree->vers, pai, NONE, succ_modificado_dir);
+
+            // O pai do filho direito do alvo já foi tratado pelo transplantar,
+            // e agora precisa ser atualizado para apontar para o sucessor modificado.
+            if (tempAlvo.dir != nullptr && tempAlvo.dir != succ) { // Se o filho direito do alvo não é o próprio sucessor
+                modificar(tree, tempAlvo.dir, tree->vers, pai, NONE, succ_modificado_dir);
+            }
         }
 
         tree->versions.push_back(tree->root); // adiciona a nova versão da árvore após a remoção
         tree->vers++;
     }
 
-    Node *busca(BST* tree, int k, int versao) //, int version) -> essa função é necessária?
-    {                            // buscar em uma versao especifica requer aplicar as mods enquanto se desce na árvore para saber os filhos para o qual o nó aponta
-       return buscaVersao(tree->versions[versao], k, versao);
+    Node *busca(BST* tree, int k, int versao){ //, int version) -> essa função é necessária?
+        // buscar em uma versao especifica requer aplicar as mods enquanto se desce na árvore para saber os filhos para o qual o nó aponta
+        if (versao < 0 || versao >= (int)tree->versions.size()) {
+            return nullptr; // Versão inválida
+        }
+        return buscaVersao(tree->versions[versao], k, versao);
     }
 
-    Node* buscaVersao(Node* no, int k, int versao) {
+    Node* buscaVersao(Node* no, int k, int versao){
         if (no == nullptr) return nullptr; // se o nó for nulo, não encontrou
-
         Node temp;
         aplicaMods(no, &temp, versao); // aplica as modificações do nó atual para a versão desejada
-        if(k == temp.chave) {
-            return no; // se a chave for igual, encontrou o nó
-        }
-        else if(k < temp.chave) {
-            return buscaVersao(temp.esq, k, versao); // se a chave for menor, desce na subárvore esquerda
-        } else {
-            return buscaVersao(temp.dir, k, versao); // se a chave for maior, desce na subárvore direita
-        }
+        if(k == temp.chave) return no; // se a chave for igual, encontrou o nó (retorna o nó original, não a cópia temporária)
+        else if(k < temp.chave) return buscaVersao(temp.esq, k, versao); // se a chave for menor, desce na subárvore esquerda
+        else return buscaVersao(temp.dir, k, versao); // se a chave for maior, desce na subárvore direita
     }
 
-    int get_key(Node* node, int version){
+    int get_key(Node* node, int version_query){
         /*Função que lê corretamente a chave de um nó dada a sua versão
         Implementei de forma que nó possa ter várias modificações dentro
         dele, porém sabemos que só pode haver no máximo 1*/
         /*
-        caso fosse um vetor: 
+        caso fosse um vetor:
         for(int index = 0; index < 1; index++) {
-        
-            if(node->mods[index].ver > version) 
+
+            if(node->mods[index].ver > version)
                 return index > 0? node->mods[index-1].modChave : node->chave;
 
-        } 
+        }
         */
-        if(node->mods.ver <= version && node->mods.campo == chave) return node->mods.modChave;  
-        else return node->chave; 
+        Node temp; // Materializa o nó para obter a chave correta
+        aplicaMods(node, &temp, version_query);
+        return temp.chave; // Retorna a chave materializada
     }
-    
-    void DFS_REC(Node* node, int version, int profundidade, vector<pair<int,int>>& dfs_vector) {
-        /*Função recursiva auxiliar que será usada para utilizar a DFS sem necessidade de dar 
-            profundidade=0 como um dos parametros na função */
 
+    void DFS_REC(Node* node, int version_query, int profundidade, vector<pair<int,int>>& dfs_vector){
+        /*Função recursiva auxiliar que será usada para utilizar a DFS sem necessidade de dar
+            profundidade=0 como um dos parametros na função */
         if(node == nullptr) return;
 
-        DFS_REC(node->esq, version, profundidade + 1, dfs_vector);
-        dfs_vector.push_back(pair<int,int>(get_key(node, version), profundidade));
-        DFS_REC(node->dir, version, profundidade + 1, dfs_vector);
-
+        Node temp; // Materializa o nó para acessar seus filhos e chave corretamente
+        aplicaMods(node, &temp, version_query);
+        DFS_REC(temp.esq, version_query, profundidade + 1, dfs_vector);
+        dfs_vector.push_back({temp.chave, profundidade}); // Usa a chave materializada
+        DFS_REC(temp.dir, version_query, profundidade + 1, dfs_vector);
     }
-    
-    vector<pair<int,int>> DFS(BST tree, int version){
-        /*Função que retorna uma array com o par (Chave, profundidade de um nó) */
 
-        Node* root = tree.versions[version];
+    vector<pair<int,int>> DFS(int version_query){ // BST tree, int version) -> Removido BST tree, já é membro
+        /*Função que retorna um array com o par (Chave, profundidade de um nó) */
+        if (version_query < 0 || version_query >= versions.size())
+            version_query = versions.size() - 1; // Garante que a versão de consulta é válida
+
+        Node* root_to_dfs = versions[version_query]; // Node* root = tree.versions[version];
         vector<pair<int,int>> dfs_vector;
 
-        DFS_REC(root, version, 0, dfs_vector);
+        DFS_REC(root_to_dfs, version_query, 0, dfs_vector);
 
         return dfs_vector;
     }
-    void imprimir(Node *no)
-    {
-        if (no != nullptr)
-        {
+
+    void imprimir(Node *no){
+        if (no != nullptr){
             imprimir(no->esq);
             cout << no->chave << " ";
             imprimir(no->dir);
         }
-    }    
+    }
 };
