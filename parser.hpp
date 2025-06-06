@@ -4,6 +4,8 @@
 
 using namespace std;
 
+const string data_path = "in.txt";
+
 enum command {
     /*Enumeração das possíveis operações na BST*/
     INC, REM, SUC, IMP
@@ -96,8 +98,3 @@ vector<operation> parser_text(string data_path){
 
     return result;
 }
-
-
-
-
-
