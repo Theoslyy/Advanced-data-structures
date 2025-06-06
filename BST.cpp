@@ -143,7 +143,7 @@ struct BST {
 
         // Se houver uma modificação válida para a 'version_query', aplica-a
         // A modificação é válida se for para a versão exata que estamos consultando
-        if ((atual->mods.campo != nenhum) && (atual->mods.ver == version_query)) {
+        if ((atual->mods.campo != nenhum) && (atual->mods.ver <= version_query)) {
              switch (atual->mods.campo){
                 case esq: temp->esq = atual->mods.modPointer; break;
                 case dir: temp->dir = atual->mods.modPointer; break;
@@ -316,11 +316,25 @@ struct BST {
         Node tempAlvo;
         aplicaMods(alvo, &tempAlvo, versao_base); // aplica as modificações do nó alvo para a versão desejada
 
-        if (tempAlvo.esq == nullptr) {
+        if (tempAlvo.esq == nullptr && tempAlvo.dir != nullptr) {
             transplantar(tree, alvo, tempAlvo.dir, versao_base); // se não tiver filho esquerdo, transplanta o filho direito
-        } else if (tempAlvo.dir == nullptr) {
+        } 
+        else if (tempAlvo.dir == nullptr && tempAlvo.esq != nullptr) {
             transplantar(tree, alvo, tempAlvo.esq, versao_base); // se não tiver filho direito, transplanta o filho esquerdo
-        } else {
+        }
+        else if(tempAlvo.esq == nullptr && tempAlvo.dir == nullptr) 
+            if (tempAlvo.pai == nullptr){ //remove e a árvore fica vazia
+                tree->versions.push_back(nullptr);
+                tree->vers++;
+                return; 
+            }
+            else{
+                if(tempAlvo.pai->esq == &tempAlvo) modificar(tree, tempAlvo.pai, tree->vers, esq, NONE, nullptr);
+                else modificar(tree, tempAlvo.pai, tree->vers, dir, NONE, nullptr);
+                tree->vers++;
+                return;
+            }
+        else {
             Node* succ = minimo(tempAlvo.dir, versao_base); // se tiver os dois filhos, encontra o sucessor
             Node tempSucc;
             aplicaMods(succ, &tempSucc, versao_base); // aplica as modificações do sucessor para a versão desejada
