@@ -51,7 +51,7 @@ struct BST {
     // Função auxiliar para criar uma cópia de um nó e aplicar uma modificação.
     // Esta função será chamada por 'modificar' APENAS quando uma cópia é necessária.
     // Retorna a nova cópia do nó que foi modificada.
-    void atualizaCadeia(BST* tree, Node *no, int versao_base, Mod modificacao_nova){ // Versão base para materializar
+    Node* atualizaCadeia(BST* tree, Node *no, int versao_base, Mod modificacao_nova){ // Versão base para materializar
         // Criando o novo nó:
         Node *no_novo = new Node();
         Node temp_original; // Para materializar o estado do nó original
@@ -107,6 +107,7 @@ struct BST {
         if(temp_original.dir != nullptr){
             modificar(tree, temp_original.dir, tree->vers, pai, NONE, no_novo);
         }
+        return no_novo;
     }
 
     // Esta função decide se uma modificação é aplicada diretamente ou se uma cópia é necessária.
@@ -131,8 +132,7 @@ struct BST {
             return no; // Retorna o nó original, que foi modificado
         } else { // O nó já tem uma modificação para esta 'versao_alvo', então precisamos de uma nova cópia na cadeia
             // A versão base para aplicaMods dentro de atualizaCadeia deve ser a versão da modificação existente no nó.
-            atualizaCadeia(tree, no, no->mods.ver, modifica);
-            return tree->root; // Retorna a nova raiz, pois a atualização da cadeia pode ter mudado a raiz da nova versão
+            return atualizaCadeia(tree, no, no->mods.ver, modifica);
         }
     }
 
@@ -275,7 +275,8 @@ struct BST {
         else // 'u' não era a raiz
         {
             Node tempPai;
-            aplicaMods(tempU.pai, &tempPai, versao_base); // Estado do pai de 'u' na versão base
+            if(tempU.pai != nullptr)
+                aplicaMods(tempU.pai, &tempPai, versao_base); // Estado do pai de 'u' na versão base
 
             Node* pai_u_modificado = modificar(tree, tempU.pai, tree->vers, pai, NONE, tempU.pai); // Garante que o pai é copiado se necessário
             // O campo 'pai' aqui é apenas para forçar a cópia se necessário.
