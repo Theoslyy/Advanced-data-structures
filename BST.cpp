@@ -273,7 +273,7 @@ struct BST {
         return nullptr;
     }
 
-    Mod transplantar(BST *tree, Node* u, Node* v, int versao_base) { // int versao)
+    void transplantar(BST *tree, Node* u, Node* v, int versao_base) { // int versao)
         // 'u' é o nó a ser substituído, 'v' é o nó que o substitui
         // 'versao_base' é a versão da qual estamos lendo para determinar os pais/filhos
 
