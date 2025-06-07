@@ -32,7 +32,7 @@ struct Node {
 
     Node()          // inicializa tudo em nulo/zero
       : esq(nullptr), dir(nullptr), pai(nullptr),
-        chave(0), mods(), isRoot(false) {}
+        mods(), chave(0) , isRoot(false) {}
 };
 
 struct BST {
@@ -62,7 +62,28 @@ struct BST {
         }
         *no_novo = temp_original;
         no_novo->mods = Mod();              // limpa qualquer mod prévio
-        no_novo->mods = modificacao_nova;   // grava o mod novo em no_novo
+        switch(modificacao_nova.campo){
+            case nenhum: 
+                break;
+            case esq:
+                no_novo->esq = modificacao_nova.modPointer;
+                break;
+            case dir:
+                no_novo->dir = modificacao_nova.modPointer;
+                break;
+
+            case pai:
+                no_novo->pai = modificacao_nova.modPointer; 
+                break;
+
+            case raiz:
+                no_novo->isRoot  = modificacao_nova.modChave;
+                break;
+
+            case chave:
+                no_novo->chave = modificacao_nova.modChave; 
+                break;
+            }
 
         tree->nodes.push_back(no_novo);
 
@@ -82,9 +103,6 @@ struct BST {
             else if (tempPaiNo.dir == no) {
                 modificar(tree, temp_original.pai, tree->vers, dir, NONE, no_novo);
             }
-        }
-        else if (no->isRoot) {
-            tree->root = no_novo;
         }
 
         // Ajusta filhos do nó original, apontando pai para a cópia:
@@ -273,122 +291,107 @@ struct BST {
     }
 
     // ------------------------------------------------------------------------
-    void remover(BST *tree, int chave, int version_base) {
-        Node *raiz_base = tree->versions[version_base];
-        tree->root = raiz_base;
+ void remover(BST *tree, int chave, int version_base) {
+    Node *raiz_base = tree->versions[version_base];
+    tree->root = raiz_base;
 
-        if (raiz_base == nullptr) {
+    if (raiz_base == nullptr) {
+        tree->versions.push_back(nullptr);
+        tree->vers++;
+        return;
+    }
+
+    Node *alvo = buscaVersao(raiz_base, chave, version_base);
+    if (!alvo) {
+        tree->versions.push_back(raiz_base);
+        tree->vers++;
+        return;
+    }
+
+    Node tempAlvo;
+    aplicaMods(alvo, &tempAlvo, version_base);
+
+    // CASO 1: sem filho esquerdo, mas com direito
+    if (tempAlvo.esq == nullptr && tempAlvo.dir != nullptr) {
+        transplantar(tree, alvo, tempAlvo.dir, version_base);
+    }
+    // CASO 2: sem filho direito, mas com esquerdo
+    else if (tempAlvo.dir == nullptr && tempAlvo.esq != nullptr) {
+        transplantar(tree, alvo, tempAlvo.esq, version_base);
+    }
+    // CASO 3: nó folha (sem filhos)
+    else if (tempAlvo.esq == nullptr && tempAlvo.dir == nullptr) {
+        if (tempAlvo.pai == nullptr) {
             tree->versions.push_back(nullptr);
             tree->vers++;
             return;
-        }
-
-        Node *alvo = buscaVersao(raiz_base, chave, version_base);
-        if (!alvo) {
-            tree->versions.push_back(raiz_base);
+        } else {
+            Node tempPai;
+            aplicaMods(tempAlvo.pai, &tempPai, version_base);
+            if (tempPai.esq == alvo) {
+                Node *pai_mod = modificar(tree, tempAlvo.pai, tree->vers, esq, NONE, nullptr);
+                if (tempAlvo.pai->isRoot) {
+                    tree->root = pai_mod;
+                }
+            } else {
+                Node *pai_mod = modificar(tree, tempAlvo.pai, tree->vers, dir, NONE, nullptr);
+                if (tempAlvo.pai->isRoot) {
+                    tree->root = pai_mod;
+                }
+            }
+            tree->versions.push_back(tree->root);
             tree->vers++;
             return;
         }
-
-        Node tempAlvo;
-        aplicaMods(alvo, &tempAlvo, version_base);
-
-        // CASO 1: sem filho esquerdo, mas com direito
-        if (tempAlvo.esq == nullptr && tempAlvo.dir != nullptr) {
-            transplantar(tree, alvo, tempAlvo.dir, version_base);
-        }
-        // CASO 2: sem filho direito, mas com esquerdo
-        else if (tempAlvo.dir == nullptr && tempAlvo.esq != nullptr) {
-            transplantar(tree, alvo, tempAlvo.esq, version_base);
-        }
-        // CASO 3: nó folha (sem filhos)
-        else if (tempAlvo.esq == nullptr && tempAlvo.dir == nullptr) {
-            if (tempAlvo.pai == nullptr) {
-                // único nó da árvore → nova versão vazia
-                tree->versions.push_back(nullptr);
-                tree->vers++;
-                return;
-            } else {
-                Node tempPai;
-                aplicaMods(tempAlvo.pai, &tempPai, version_base);
-                if (tempPai.esq == alvo) {
-                    Node *pai_mod = modificar(tree, tempAlvo.pai, tree->vers, esq, NONE, nullptr);
-                    if (tempAlvo.pai->isRoot) {
-                        tree->root = pai_mod;
-                    }
-                } else {
-                    Node *pai_mod = modificar(tree, tempAlvo.pai, tree->vers, dir, NONE, nullptr);
-                    if (tempAlvo.pai->isRoot) {
-                        tree->root = pai_mod;
-                    }
-                }
-                tree->versions.push_back(tree->root);
-                tree->vers++;
-                return;
-            }
-        }
-        // CASO 4: nó com dois filhos → substitua pelo sucessor
-        else {
-            Node *succ = minimo(tempAlvo.dir, version_base);
-            Node tempSucc;
-            aplicaMods(succ, &tempSucc, version_base);
-
-            if (tempSucc.pai != alvo) {
-                transplantar(tree, succ, tempSucc.dir, version_base);
-                if (tempSucc.dir != nullptr) {
-                    Node *mod_dir = modificar(tree,
-                                              tempSucc.dir,
-                                              tree->vers,
-                                              pai,
-                                              NONE,
-                                              succ);
-                    if (tempSucc.dir->isRoot) {
-                        tree->root = mod_dir;
-                    }
-                }
-            }
-
-            transplantar(tree, alvo, succ, version_base);
-            if (alvo->isRoot) {
-                tree->root = succ;
-            }
-
-            Node *succ_e = modificar(tree, succ, tree->vers, esq, NONE, tempAlvo.esq);
-            if (succ->isRoot) {
-                tree->root = succ_e;
-            }
-            Node *succ_d = modificar(tree, succ_e, tree->vers, dir, NONE, tempAlvo.dir);
-            if (succ_e->isRoot) {
-                tree->root = succ_d;
-            }
-
-            if (tempAlvo.esq != nullptr) {
-                Node *mod_esq = modificar(tree,
-                                          tempAlvo.esq,
-                                          tree->vers,
-                                          pai,
-                                          NONE,
-                                          succ_d);
-                if (tempAlvo.esq->isRoot) {
-                    tree->root = mod_esq;
-                }
-            }
-            if (tempAlvo.dir != nullptr && tempAlvo.dir != succ) {
-                Node *mod_dir2 = modificar(tree,
-                                           tempAlvo.dir,
-                                           tree->vers,
-                                           pai,
-                                           NONE,
-                                           succ_d);
-                if (tempAlvo.dir->isRoot) {
-                    tree->root = mod_dir2;
-                }
-            }
-        }
-
-        tree->versions.push_back(tree->root);
-        tree->vers++;
     }
+    // CASO 4: nó com dois filhos
+    else {
+        Node *succ = minimo(tempAlvo.dir, version_base);
+        Node tempSucc;
+        aplicaMods(succ, &tempSucc, version_base);
+
+        if (tempSucc.pai != alvo) {
+            transplantar(tree, succ, tempSucc.dir, version_base);
+            if (tempSucc.dir != nullptr) {
+                Node *mod_dir = modificar(tree, tempSucc.dir, tree->vers, pai, NONE, succ);
+                if (tempSucc.dir->isRoot) {
+                    tree->root = mod_dir;
+                }
+            }
+        }
+
+        transplantar(tree, alvo, succ, version_base);
+        if (alvo->isRoot) {
+            tree->root = succ;
+        }
+
+        // --- FIXED SECTION: avoid double modificar on succ ---
+        Node* succ_copy = new Node(tempSucc);  // single fresh copy
+        succ_copy->mods = Mod();
+        succ_copy->esq = tempAlvo.esq;
+        succ_copy->dir = tempAlvo.dir;
+        succ_copy->isRoot = succ->isRoot;
+        if (succ_copy->isRoot) {
+            tree->root = succ_copy;
+        }
+        tree->nodes.push_back(succ_copy);
+
+        // update children to point back to new succ_copy
+        if (tempAlvo.esq != nullptr) {
+            modificar(tree, tempAlvo.esq, tree->vers, pai, NONE, succ_copy);
+        }
+        if (tempAlvo.dir != nullptr && tempAlvo.dir != succ) {
+            modificar(tree, tempAlvo.dir, tree->vers, pai, NONE, succ_copy);
+        }
+
+        // also update root if necessary
+        tree->root = succ_copy;
+    }
+
+    tree->versions.push_back(tree->root);
+    tree->vers++;
+}
+
 
     // ------------------------------------------------------------------------
     Node *busca(BST* tree, int k, int versao) {
