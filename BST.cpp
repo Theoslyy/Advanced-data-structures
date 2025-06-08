@@ -53,9 +53,11 @@ struct BST {
     // Esta função será chamada por 'modificar' APENAS quando uma cópia é necessária.
     // Retorna a nova cópia do nó que foi modificada.
     Node* atualizaCadeia(BST* tree, Node *no, int versao_base, Mod modificacao_nova){ // Versão base para materializar
+        cout << "cadeia.. \n";
         // Criando o novo nó:
         Node *no_novo = new Node();
-        Node temp_original; // Para materializar o estado do nó original
+        Node temp_original;
+        aplicaMods(no, &temp_original, modificacao_nova.ver);
         //os dois primeiros ifs são só de teste. 
         if (no->mods.campo != nenhum && no->mods.ver == modificacao_nova.ver)
         {
@@ -72,16 +74,25 @@ struct BST {
         }
         //esse if é desnecessário. Essa função só será chamada se tiver um nó com uma modificação que estourou
         //e só pode ser modificado um nó a partir de uma versão maior do que a atual. 
-        if (no->mods.campo != nenhum && no->mods.ver < modificacao_nova.ver)
-        {
-            cout << "Hi" << "\n";
-            aplicaMods(no, &temp_original, modificacao_nova.ver);
-        }
-        cout << no->chave << "\n"; 
-        *no_novo = temp_original;
+        no_novo->esq = no->esq;
+        no_novo->dir = no->dir;
+        no_novo->pai = no->pai;
+        no_novo->isRoot = no->isRoot;
+        no_novo->chave = no->chave; 
         no_novo->mods = Mod(); // Limpa as modificações da cópia (será preenchida agora)
+        
+        switch (no->mods.campo){
+        case esq: no_novo->esq = no->mods.modPointer; break;
+        case dir: no_novo->dir = no->mods.modPointer; break;
+        case pai: no_novo->pai = no->mods.modPointer; break;
+        case raiz: no_novo->isRoot = no->mods.modChave; if(no_novo->isRoot) no_novo->pai = nullptr; break;
+        case chave: no_novo->chave = no->mods.modChave; break;
+        default: break;
+        }
+        if(no_novo->dir != nullptr)
+        cout << "dir: " << no_novo->dir->chave<< "\n";;
         switch (modificacao_nova.campo){
-        case esq: no_novo->esq = modificacao_nova.modPointer; cout << "muito sexo"; break;
+        case esq: no_novo->esq = modificacao_nova.modPointer; break;
         case dir: no_novo->dir = modificacao_nova.modPointer; break;
         case pai: no_novo->pai = modificacao_nova.modPointer; break;
         case raiz: no_novo->isRoot = modificacao_nova.modChave; if(no_novo->isRoot) no_novo->pai = nullptr; break;
@@ -89,6 +100,17 @@ struct BST {
         default: break;
         }
         no_novo->ver = modificacao_nova.ver; 
+        cout << "\n";
+        if(no->mods.modPointer != nullptr)
+        cout << "modpointer :" << no->mods.modPointer->chave<< "\n";; 
+        cout << "no novo todo: \n";
+        cout << no_novo->chave << "\n";
+        if(no_novo->esq != nullptr)
+        cout << "esq: " << no_novo->esq->chave<< "\n";;
+        if(no_novo->dir != nullptr)
+        cout << "dir: " << no_novo->dir->chave<< "\n";
+        if(no_novo->pai != nullptr)
+        cout << "pai:" << no_novo->pai->chave<< "\n"; 
 
         // Adiciona a cópia ao vetor de todos os nós para gerenciamento de memória
         tree->nodes.push_back(no_novo);
@@ -104,7 +126,6 @@ struct BST {
         else if (temp_original.pai != nullptr){
             Node tempPaiNo;
             aplicaMods(temp_original.pai, &tempPaiNo, modificacao_nova.ver); // Materializa o pai do 'no' na versao_base
-            cout << tempPaiNo.esq->ver << "\n";  
             // O pai de 'no' (temp_original.pai) deve apontar para 'no_novo' na nova versão
             if (tempPaiNo.esq == no) { // Se 'no' era filho esquerdo do seu pai
                 modificar(tree, no_novo->pai, modificacao_nova.ver, esq, NONE, no_novo);
@@ -115,12 +136,16 @@ struct BST {
         // Ajusta os ponteiros de filhos do nó original para que seus pais apontem para 'no_novo'
         // (A cópia do nó original se torna o pai para seus filhos na nova versão)
         if(temp_original.esq != nullptr){
-            cout << "gosto muito de sexo";
             modificar(tree, no_novo->esq, modificacao_nova.ver, pai, NONE, no_novo);
         }
         if(temp_original.dir != nullptr){
             modificar(tree, no_novo->dir, modificacao_nova.ver, pai, NONE, no_novo);
         }
+        cout << "fim da cadeia.. :";
+        if(no_novo->esq != nullptr)
+        cout << "esq: " << no_novo->esq->chave; 
+        if(no_novo->dir != nullptr)
+        cout << "dir: " << no_novo->dir->chave; 
         return no_novo;
     }
 
@@ -128,23 +153,43 @@ struct BST {
     // Retorna o nó (original ou uma nova cópia) que foi modificado e que agora pertence à versao_alvo.
     Node* modificar(BST *tree, Node *no, int versao_alvo, field campo, int valor_chave = NONE, Node* valor_no = nullptr){
         if (no == nullptr) return nullptr;
-
+        cout << "MODIFICA!! \n";
         Mod modifica;
         modifica.ver = versao_alvo;
         modifica.campo = campo;
         modifica.modChave = valor_chave;
         modifica.modPointer = valor_no;
-        cout << "Hi";
         // Se o nó ainda não tem modificação para esta versão
         // Isso significa que podemos aplicar a modificação diretamente ao nó sem criar uma cópia
         if (no->mods.campo == nenhum) {
             no->mods = modifica;
+            if(modifica.modPointer !=nullptr)
+            cout << "modificacao: " << modifica.modPointer->chave;
+            cout << "ver da modificacao : " << modifica.ver; 
             if (campo == raiz && valor_chave == 1) { // Se a modificação for tornar o nó raiz
                 tree->root = no;
             }
+            cout << "preenchendo" << no->chave << " com: ";
+            cout << valor_no->chave << " "; 
+            if(no->esq != nullptr)
+            cout << "esq: " << no->esq->chave; 
+            if(no->dir != nullptr)
+            cout << "dir: " << no->dir->chave; 
+            cout << "testing stuff:";
+            cout << no->chave << "\n";
+            cout << no->mods.ver << "\n";
+            if(no->mods.modPointer !=nullptr)
+            cout << no->mods.modPointer->chave << "\n";
             return no; // Retorna o nó original, que foi modificado
         } else { // O nó já tem uma modificação para esta 'versao_alvo', então precisamos de uma nova cópia na cadeia
             // A versão base para aplicaMods dentro de atualizaCadeia deve ser a versão da modificação existente no nó.
+            cout << "lotou... " << no->chave << "com : ";
+            if (valor_no != nullptr)
+            cout << valor_no->chave << " ";  
+            if(no->esq != nullptr)
+            cout << "esq: " << no->esq->chave; 
+            if(no->dir != nullptr)
+            cout << "dir: " << no->dir->chave;
             return atualizaCadeia(tree, no, no->mods.ver, modifica);
         }
     }
@@ -170,11 +215,10 @@ struct BST {
 
     void inserir(BST *tree, int k, int version_base) {
         // 'version_base' é a versão da qual estamos partindo para criar a nova versão
-
+        cout << "BUSCA POR " << k << "!! \n";
         // A raiz da nova versão (tree->root) deve ser inicializada a partir da raiz da versão base.
         // Qualquer modificação subsequente irá atualizar tree->root para a nova cópia se a raiz mudar.
         tree->root = tree->versions[version_base];
-
         Node *no_novo = new Node();
         no_novo->chave = k;
         no_novo->ver = version_base+1;
@@ -188,6 +232,7 @@ struct BST {
             tree->vers++; 
             return; 
         }
+        cout << "ver da raiz: " << tree->root->ver << " - " << tree->root->mods.ver; 
         Node *no_atual_search = tree->root;
         Node *no_anterior_search = nullptr;
 
@@ -199,7 +244,7 @@ struct BST {
             no_anterior_search = no_atual_search;
             // Nao precisamos materializar no_anterior_search aqui, ele é apenas uma referencia ao no_atual_search antes do loop.
             // aplicaMods(no_anterior_search, &no_temp_anterior, version_base); // Removido: Redundante
-
+            cout << no_atual_search->chave << " - "; 
             if (no_novo->chave < no_temp_atual.chave)
                 no_atual_search = no_temp_atual.esq;
             else
@@ -344,10 +389,9 @@ struct BST {
 
     void remover(BST *tree, int chave, int versao_base) { // int versao)
         // 'versao_base' é a versão da qual estamos partindo para criar a nova versão
-
+        cout << "REMOVE!! \n";
         // A raiz da nova versão (tree->root) deve ser inicializada a partir da raiz da versão base.
         tree->root = tree->versions[versao_base];
-        cout << "Hi";
         if (tree->root == nullptr) { // Se a árvore base está vazia
             tree->versions.push_back(nullptr); // Nova versão também vazia
             tree->vers++;
@@ -360,9 +404,12 @@ struct BST {
             tree->vers++;
             return;
         }
-        cout << "Hi";
+        cout << "ver da raiz: " << tree->root->ver << " - " << tree->root->mods.ver; 
         Node tempAlvo;
+        cout << "mods alvo ver: " << alvo->mods.ver;
+        cout << "aaah" << "ver base: " << versao_base << "\n ";
         aplicaMods(alvo, &tempAlvo, versao_base); // aplica as modificações do nó alvo para a versão desejada
+        cout << "mods tempAlvo ver: " << tempAlvo.mods.ver;
         Node* tempNovo; 
         if (tempAlvo.esq == nullptr && tempAlvo.dir != nullptr) {
             tempNovo = transplantar(tree, alvo, tempAlvo.dir, versao_base); // se não tiver filho esquerdo, transplanta o filho direito
@@ -370,22 +417,22 @@ struct BST {
         else if (tempAlvo.dir == nullptr && tempAlvo.esq != nullptr) {
             tempNovo = transplantar(tree, alvo, tempAlvo.esq, versao_base); // se não tiver filho direito, transplanta o filho esquerdo
         }
-        else if(tempAlvo.esq == nullptr && tempAlvo.dir == nullptr) 
+        else if(tempAlvo.esq == nullptr && tempAlvo.dir == nullptr) {
+            cout << "aaah";
             if (tempAlvo.isRoot){ //remove e a árvore fica vazia
                 tree->versions.push_back(nullptr);
                 tree->vers++;
                 return; 
             }
             else{
-                cout << "Hi";
-                cout << tempAlvo.chave; 
-                if(tempAlvo.pai->esq == &tempAlvo) modificar(tree, tempAlvo.pai, versao_base+1, esq, NONE, nullptr);
+                if(tempAlvo.pai->chave > tempAlvo.chave) modificar(tree, tempAlvo.pai, versao_base+1, esq, NONE, nullptr);
                 else modificar(tree, tempAlvo.pai, versao_base+1, dir, NONE, nullptr);
                 tree->versions.push_back(tree->root);
                 tree->vers++;
-                cout << "Hi";
+                cout << "fim remoção pwww";
                 return;
             }
+        }
         else {
             Node* succ = minimo(tempAlvo.dir, versao_base); // se tiver os dois filhos, encontra o sucessor
             Node tempSucc;
@@ -437,6 +484,7 @@ struct BST {
         if (no == nullptr) return nullptr; // se o nó for nulo, não encontrou
         Node temp;
         aplicaMods(no, &temp, versao); // aplica as modificações do nó atual para a versão desejada
+        cout << "mods do no buscando: " << temp.mods.ver;
         if(k == temp.chave) return no; // se a chave for igual, encontrou o nó (retorna o nó original, não a cópia temporária)
         else if(k < temp.chave) return buscaVersao(temp.esq, k, versao); // se a chave for menor, desce na subárvore esquerda
         else return buscaVersao(temp.dir, k, versao); // se a chave for maior, desce na subárvore direita
